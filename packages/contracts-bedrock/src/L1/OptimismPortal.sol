@@ -24,13 +24,14 @@ import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
 import { IResourceMetering } from "src/L1/interfaces/IResourceMetering.sol";
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { IL1Block } from "src/L2/interfaces/IL1Block.sol";
+import { IEthBalanceWithdrawer } from "src/L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
 
 /// @custom:proxied true
 /// @title OptimismPortal
 /// @notice The OptimismPortal is a low-level contract responsible for passing messages between L1
 ///         and L2. Messages sent directly to the OptimismPortal have no form of replayability.
 ///         Users are encouraged to use the L1CrossDomainMessenger for a higher-level interface.
-contract OptimismPortal is Initializable, ResourceMetering, ISemver {
+contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalanceWithdrawer {
     /// @notice Allows for interactions with non standard ERC20 tokens.
     using SafeERC20 for IERC20;
 
@@ -217,6 +218,18 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver {
     ///         Optimism system and Bedrock.
     function donateETH() external payable {
         // Intentionally empty.
+    }
+
+    /// @notice Withdraws user eth balance
+    /// @param _user The user address
+    /// @param _ethBalance The eth balance of the user
+    function withdrawEthBalance(address _user, uint256 _ethBalance) external {
+        // TODO: change address to the BalanceClaimer address once is deployed
+        if (msg.sender != address(0)) revert CallerNotBalanceClaimer();
+        (bool success,) = _user.call{ value: _ethBalance }("");
+        if (!success) {
+            revert EthTransferFailed();
+        }
     }
 
     /// @notice Returns the gas paying token and its decimals.

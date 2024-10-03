@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 // Contracts
 import { StandardBridge } from "src/universal/StandardBridge.sol";
 
@@ -12,6 +15,7 @@ import { ISemver } from "src/universal/interfaces/ISemver.sol";
 import { ICrossDomainMessenger } from "src/universal/interfaces/ICrossDomainMessenger.sol";
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
+import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
 
 /// @custom:proxied true
 /// @title L1StandardBridge
@@ -23,7 +27,9 @@ import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
 ///         NOTE: this contract is not intended to support all variations of ERC20 tokens. Examples
 ///         of some token types that may not be properly supported by this contract include, but are
 ///         not limited to: tokens with transfer fees, rebasing tokens, and tokens with blocklists.
-contract L1StandardBridge is StandardBridge, ISemver {
+contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
+    using SafeERC20 for IERC20;
+
     /// @custom:legacy
     /// @notice Emitted whenever a deposit of ETH from L1 into L2 is initiated.
     /// @param from      Address of the depositor.
@@ -236,6 +242,39 @@ contract L1StandardBridge is StandardBridge, ISemver {
         external
     {
         finalizeBridgeERC20(_l1Token, _l2Token, _from, _to, _amount, _extraData);
+    }
+
+    /// @notice Withdraws the ERC20 balance to the user
+    /// @param _user The user address
+    /// @param _daiBalance The DAI balance of the user
+    /// @param _usdcBalance The USDC balance of the user
+    /// @param _usdtBalance The USDT balance of the user
+    /// @param _gtcBalance The GTC balance of the user
+    function withdrawErc20Balance(
+        address _user,
+        uint256 _daiBalance,
+        uint256 _usdcBalance,
+        uint256 _usdtBalance,
+        uint256 _gtcBalance
+    )
+        external
+    {
+        // TODO: change address to the BalanceClaimer address once is deployed
+        if (msg.sender != address(0)) {
+            revert CallerNotBalanceClaimer();
+        }
+        if (_daiBalance > 0) {
+            IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F).safeTransfer(_user, _daiBalance);
+        }
+        if (_usdcBalance > 0) {
+            IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).safeTransfer(_user, _usdcBalance);
+        }
+        if (_usdtBalance > 0) {
+            IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7).safeTransfer(_user, _usdtBalance);
+        }
+        if (_gtcBalance > 0) {
+            IERC20(0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F).safeTransfer(_user, _gtcBalance);
+        }
     }
 
     /// @custom:legacy
