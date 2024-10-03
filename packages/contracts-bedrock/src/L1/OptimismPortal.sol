@@ -137,6 +137,7 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalance
     /// @notice Semantic version.
     /// @custom:semver 2.8.1-beta.3
     function version() public pure virtual returns (string memory) {
+        // TODO: update version
         return "2.8.1-beta.3";
     }
 

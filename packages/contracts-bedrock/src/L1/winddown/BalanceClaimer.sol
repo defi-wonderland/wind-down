@@ -14,11 +14,11 @@ contract BalanceClaimer is IBalanceClaimer {
     bytes32 public root;
 
     /// @notice OptimismPortal proxy address
-    IEthBalanceWithdrawer public constant ETH_BALANCE_SENDER =
+    IEthBalanceWithdrawer public constant ETH_BALANCE_WITHDRAWER =
         IEthBalanceWithdrawer(0xb26Fd985c5959bBB382BAFdD0b879E149e48116c);
 
     /// @notice L1StandardBridge proxy address
-    IErc20BalanceWithdrawer public constant ERC20_BALANCE_SENDER =
+    IErc20BalanceWithdrawer public constant ERC20_BALANCE_WITHDRAWER =
         IErc20BalanceWithdrawer(0xD0204B9527C1bA7bD765Fa5CCD9355d38338272b);
 
     /// @notice The mapping of users who have claimed their balances
@@ -52,10 +52,10 @@ contract BalanceClaimer is IBalanceClaimer {
         }
         claimed[_user] = true;
         if (_daiBalance != 0 || _usdcBalance != 0 || _usdtBalance != 0 || _gtcBalance != 0) {
-            ERC20_BALANCE_SENDER.withdrawErc20Balance(_user, _daiBalance, _usdcBalance, _usdtBalance, _gtcBalance);
+            ERC20_BALANCE_WITHDRAWER.withdrawErc20Balance(_user, _daiBalance, _usdcBalance, _usdtBalance, _gtcBalance);
         }
         if (_ethBalance != 0) {
-            ETH_BALANCE_SENDER.withdrawEthBalance(_user, _ethBalance);
+            ETH_BALANCE_WITHDRAWER.withdrawEthBalance(_user, _ethBalance);
         }
         emit BalanceClaimed({
             user: _user,

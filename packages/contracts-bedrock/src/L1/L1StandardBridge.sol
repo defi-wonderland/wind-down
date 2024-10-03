@@ -82,6 +82,7 @@ contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
 
     /// @notice Semantic version.
     /// @custom:semver 2.2.1-beta.1
+    // TODO: update version
     string public constant version = "2.2.1-beta.1";
 
     /// @notice Address of the SuperchainConfig contract.
