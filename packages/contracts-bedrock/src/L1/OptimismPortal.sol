@@ -108,6 +108,9 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalance
     ///         It is not safe to trust `ERC20.balanceOf` as it may lie.
     uint256 internal _balance;
 
+        address public balanceClaimer;
+
+
     /// @notice Emitted when a transaction is deposited from L1 to L2.
     ///         The parameters of this event are read by the rollup node and used to derive deposit
     ///         transactions on L2.
@@ -146,7 +149,8 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalance
         initialize({
             _l2Oracle: IL2OutputOracle(address(0)),
             _systemConfig: ISystemConfig(address(0)),
-            _superchainConfig: ISuperchainConfig(address(0))
+            _superchainConfig: ISuperchainConfig(address(0)),
+            _balanceClaimer: address(0)
         });
     }
 
@@ -154,10 +158,12 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalance
     /// @param _l2Oracle Contract of the L2OutputOracle.
     /// @param _systemConfig Contract of the SystemConfig.
     /// @param _superchainConfig Contract of the SuperchainConfig.
+    /// @param _balanceClaimer Address of the balance claimer.
     function initialize(
         IL2OutputOracle _l2Oracle,
         ISystemConfig _systemConfig,
-        ISuperchainConfig _superchainConfig
+        ISuperchainConfig _superchainConfig,
+        address _balanceClaimer
     )
         public
         initializer
@@ -168,6 +174,7 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalance
         if (l2Sender == address(0)) {
             l2Sender = Constants.DEFAULT_L2_SENDER;
         }
+        balanceClaimer = _balanceClaimer;
         __ResourceMetering_init();
     }
 
@@ -225,8 +232,7 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalance
     /// @param _user The user address
     /// @param _ethBalance The eth balance of the user
     function withdrawEthBalance(address _user, uint256 _ethBalance) external {
-        // TODO: change address to the BalanceClaimer address once is deployed
-        if (msg.sender != address(0)) revert CallerNotBalanceClaimer();
+        if (msg.sender != balanceClaimer) revert CallerNotBalanceClaimer();
         (bool success,) = _user.call{ value: _ethBalance }("");
         if (!success) {
             revert EthTransferFailed();

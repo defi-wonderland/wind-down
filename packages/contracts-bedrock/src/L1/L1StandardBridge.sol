@@ -30,6 +30,11 @@ import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20Balanc
 contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
     using SafeERC20 for IERC20;
 
+    IERC20 public constant DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 public constant USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    IERC20 public constant USDT = IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+    IERC20 public constant GTC = IERC20(0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F);
+
     /// @custom:legacy
     /// @notice Emitted whenever a deposit of ETH from L1 into L2 is initiated.
     /// @param from      Address of the depositor.
@@ -91,22 +96,28 @@ contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
     /// @notice Address of the SystemConfig contract.
     ISystemConfig public systemConfig;
 
+    address public balanceClaimer;
+
     /// @notice Constructs the L1StandardBridge contract.
     constructor() StandardBridge() {
         initialize({
             _messenger: ICrossDomainMessenger(address(0)),
             _superchainConfig: ISuperchainConfig(address(0)),
-            _systemConfig: ISystemConfig(address(0))
+            _systemConfig: ISystemConfig(address(0)),
+            _balanceClaimer: address(0)
         });
     }
 
     /// @notice Initializer.
     /// @param _messenger        Contract for the CrossDomainMessenger on this network.
     /// @param _superchainConfig Contract for the SuperchainConfig on this network.
+    /// @param _systemConfig     Contract for the SystemConfig on this network.
+    /// @param _balanceClaimer   Address of the balance claimer.
     function initialize(
         ICrossDomainMessenger _messenger,
         ISuperchainConfig _superchainConfig,
-        ISystemConfig _systemConfig
+        ISystemConfig _systemConfig,
+        address _balanceClaimer
     )
         public
         initializer
@@ -117,6 +128,7 @@ contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
             _messenger: _messenger,
             _otherBridge: StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE))
         });
+        balanceClaimer = _balanceClaimer;
     }
 
     /// @inheritdoc StandardBridge
@@ -260,21 +272,20 @@ contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
     )
         external
     {
-        // TODO: change address to the BalanceClaimer address once is deployed
-        if (msg.sender != address(0)) {
+        if (msg.sender != balanceClaimer) {
             revert CallerNotBalanceClaimer();
         }
         if (_daiBalance > 0) {
-            IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F).safeTransfer(_user, _daiBalance);
+            DAI.safeTransfer(_user, _daiBalance);
         }
         if (_usdcBalance > 0) {
-            IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48).safeTransfer(_user, _usdcBalance);
+            USDC.safeTransfer(_user, _usdcBalance);
         }
         if (_usdtBalance > 0) {
-            IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7).safeTransfer(_user, _usdtBalance);
+            USDT.safeTransfer(_user, _usdtBalance);
         }
         if (_gtcBalance > 0) {
-            IERC20(0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F).safeTransfer(_user, _gtcBalance);
+            GTC.safeTransfer(_user, _gtcBalance);
         }
     }
 
