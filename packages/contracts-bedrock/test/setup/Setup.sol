@@ -49,6 +49,7 @@ import { IETHLiquidity } from "src/L2/interfaces/IETHLiquidity.sol";
 import { IWETH } from "src/universal/interfaces/IWETH.sol";
 import { IGovernanceToken } from "src/governance/interfaces/IGovernanceToken.sol";
 import { ILegacyMessagePasser } from "src/legacy/interfaces/ILegacyMessagePasser.sol";
+import { IBalanceClaimer } from "src/L1/interfaces/winddown/IBalanceClaimer.sol";
 
 /// @title Setup
 /// @dev This contact is responsible for setting up the contracts in state. It currently
@@ -87,6 +88,7 @@ contract Setup {
     IProtocolVersions protocolVersions;
     ISuperchainConfig superchainConfig;
     IDataAvailabilityChallenge dataAvailabilityChallenge;
+    IBalanceClaimer balanceClaimer;
 
     // L2 contracts
     IL2CrossDomainMessenger l2CrossDomainMessenger =
@@ -150,6 +152,7 @@ contract Setup {
         l2OutputOracle = IL2OutputOracle(deploy.mustGetAddress("L2OutputOracleProxy"));
         systemConfig = ISystemConfig(deploy.mustGetAddress("SystemConfigProxy"));
         l1StandardBridge = IL1StandardBridge(deploy.mustGetAddress("L1StandardBridgeProxy"));
+        balanceClaimer = IBalanceClaimer(deploy.mustGetAddress("BalanceClaimerProxy"));
         l1CrossDomainMessenger = IL1CrossDomainMessenger(deploy.mustGetAddress("L1CrossDomainMessengerProxy"));
         addressManager = IAddressManager(deploy.mustGetAddress("AddressManager"));
         l1ERC721Bridge = IL1ERC721Bridge(deploy.mustGetAddress("L1ERC721BridgeProxy"));
@@ -169,6 +172,8 @@ contract Setup {
         vm.label(deploy.mustGetAddress("DelayedWETHProxy"), "DelayedWETHProxy");
         vm.label(address(systemConfig), "SystemConfig");
         vm.label(deploy.mustGetAddress("SystemConfigProxy"), "SystemConfigProxy");
+        vm.label(address(balanceClaimer), "BalanceClaimer");
+        vm.label(deploy.mustGetAddress("BalanceClaimer"), "BalanceClaimer");
         vm.label(address(l1StandardBridge), "L1StandardBridge");
         vm.label(deploy.mustGetAddress("L1StandardBridgeProxy"), "L1StandardBridgeProxy");
         vm.label(address(l1CrossDomainMessenger), "L1CrossDomainMessenger");

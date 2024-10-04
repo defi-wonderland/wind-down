@@ -22,6 +22,7 @@ import { DeploySuperchainInput, DeploySuperchain, DeploySuperchainOutput } from 
 // Contracts
 import { AddressManager } from "src/legacy/AddressManager.sol";
 import { StorageSetter } from "src/universal/StorageSetter.sol";
+import { BalanceClaimer } from "src/L1/winddown/BalanceClaimer.sol";
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
@@ -58,6 +59,9 @@ import { IOptimismMintableERC20Factory } from "src/universal/interfaces/IOptimis
 import { IAddressManager } from "src/legacy/interfaces/IAddressManager.sol";
 import { IL1ChugSplashProxy } from "src/legacy/interfaces/IL1ChugSplashProxy.sol";
 import { IResolvedDelegateProxy } from "src/legacy/interfaces/IResolvedDelegateProxy.sol";
+import { IBalanceClaimer } from "src/L1/interfaces/winddown/IBalanceClaimer.sol";
+import { IEthBalanceWithdrawer } from "src/L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
+import { ISemver } from "src/universal/interfaces/ISemver.sol";
 
 /// @title Deploy
 /// @notice Script used to deploy a bedrock system. The entire system is deployed within the `run` function.
@@ -160,7 +164,8 @@ contract Deploy is Deployer {
             SystemConfig: getAddress("SystemConfigProxy"),
             L1ERC721Bridge: getAddress("L1ERC721BridgeProxy"),
             ProtocolVersions: getAddress("ProtocolVersionsProxy"),
-            SuperchainConfig: getAddress("SuperchainConfigProxy")
+            SuperchainConfig: getAddress("SuperchainConfigProxy"),
+            BalanceClaimer: getAddress("BalanceClaimerProxy")
         });
     }
 
@@ -350,6 +355,7 @@ contract Deploy is Deployer {
         deployL1CrossDomainMessengerProxy();
         deployERC1967Proxy("OptimismMintableERC20FactoryProxy");
         deployERC1967Proxy("L1ERC721BridgeProxy");
+        deployERC1967Proxy("BalanceClaimerProxy");
 
         // Both the DisputeGameFactory and L2OutputOracle proxies are deployed regardless of whether fault proofs is
         // enabled to prevent a nastier refactor to the deploy scripts. In the future, the L2OutputOracle will be
@@ -379,6 +385,10 @@ contract Deploy is Deployer {
         deployL1CrossDomainMessenger();
         deployOptimismMintableERC20Factory();
         deploySystemConfig();
+
+        // Deploy Balance claimer required by L1StandardBridge and OptimismPortal
+        deployBalanceClaimer();
+
         deployL1StandardBridge();
         deployL1ERC721Bridge();
 
@@ -428,6 +438,7 @@ contract Deploy is Deployer {
         initializeDelayedWETH();
         initializePermissionedDelayedWETH();
         initializeAnchorStateRegistry();
+        initializeBalanceClaimer();
     }
 
     /// @notice Add AltDA setup to the OP chain
@@ -888,6 +899,20 @@ contract Deploy is Deployer {
         addr_ = address(bridge);
     }
 
+    /// @notice Deploy the BalanceClaimer
+    function deployBalanceClaimer() public broadcast returns (address addr_) {
+        addr_ = DeployUtils.create2AndSave({
+            _save: this,
+            _salt: _implSalt(),
+            _name: "BalanceClaimer",
+            _args: DeployUtils.encodeConstructor(abi.encodeWithSignature("__constructor__", abi.encode()))
+        });
+
+        Types.ContractSet memory contracts = _proxiesUnstrict();
+        contracts.BalanceClaimer = addr_;
+        ChainAssertions.checkBalanceClaimer({ _contracts: contracts, _isProxy: false });
+    }
+
     /// @notice Deploy the L1ERC721Bridge
     function deployL1ERC721Bridge() public broadcast returns (address addr_) {
         IL1ERC721Bridge bridge = IL1ERC721Bridge(
@@ -1119,6 +1144,7 @@ contract Deploy is Deployer {
         address l1CrossDomainMessengerProxy = mustGetAddress("L1CrossDomainMessengerProxy");
         address superchainConfigProxy = mustGetAddress("SuperchainConfigProxy");
         address systemConfigProxy = mustGetAddress("SystemConfigProxy");
+        address balanceClaimerProxy = mustGetAddress("BalanceClaimerProxy");
 
         uint256 proxyType = uint256(proxyAdmin.proxyType(l1StandardBridgeProxy));
         if (proxyType != uint256(IProxyAdmin.ProxyType.CHUGSPLASH)) {
@@ -1134,7 +1160,8 @@ contract Deploy is Deployer {
                 (
                     ICrossDomainMessenger(l1CrossDomainMessengerProxy),
                     ISuperchainConfig(superchainConfigProxy),
-                    ISystemConfig(systemConfigProxy)
+                    ISystemConfig(systemConfigProxy),
+                    balanceClaimerProxy
                 )
             )
         });
@@ -1281,6 +1308,7 @@ contract Deploy is Deployer {
         address l2OutputOracleProxy = mustGetAddress("L2OutputOracleProxy");
         address systemConfigProxy = mustGetAddress("SystemConfigProxy");
         address superchainConfigProxy = mustGetAddress("SuperchainConfigProxy");
+        address balanceClaimerProxy = mustGetAddress("BalanceClaimerProxy");
 
         IProxyAdmin proxyAdmin = IProxyAdmin(payable(mustGetAddress("ProxyAdmin")));
         proxyAdmin.upgradeAndCall({
@@ -1291,7 +1319,8 @@ contract Deploy is Deployer {
                 (
                     IL2OutputOracle(l2OutputOracleProxy),
                     ISystemConfig(systemConfigProxy),
-                    ISuperchainConfig(superchainConfigProxy)
+                    ISuperchainConfig(superchainConfigProxy),
+                    balanceClaimerProxy
                 )
             )
         });
@@ -1332,6 +1361,31 @@ contract Deploy is Deployer {
         console.log("OptimismPortal2 version: %s", version);
 
         ChainAssertions.checkOptimismPortal2({ _contracts: _proxiesUnstrict(), _cfg: cfg, _isProxy: true });
+    }
+
+    /// @notice Initialize the BalanceClaimer contract
+    function initializeBalanceClaimer() public broadcast {
+        console.log("Upgrading and initializing BalanceClaimer proxy");
+        address balanceClaimerProxy = mustGetAddress("BalanceClaimerProxy");
+        address balanceClaimer = mustGetAddress("BalanceClaimer");
+        address optimismPortalProxy = mustGetAddress("OptimismPortalProxy");
+        address l1StandardBridgeProxy = mustGetAddress("L1StandardBridgeProxy");
+
+        bytes32 _merkleRoot = bytes32(0);
+
+        IProxyAdmin proxyAdmin = IProxyAdmin(payable(mustGetAddress("ProxyAdmin")));
+        proxyAdmin.upgradeAndCall({
+            _proxy: payable(balanceClaimerProxy),
+            _implementation: balanceClaimer,
+            _data: abi.encodeCall(IBalanceClaimer.initialize, (optimismPortalProxy, l1StandardBridgeProxy, _merkleRoot))
+        });
+
+        //IOptimismPortal2 portal = IOptimismPortal2(payable(optimismPortalProxy));
+        IBalanceClaimer _balanceClaimer = IBalanceClaimer(payable(balanceClaimerProxy));
+        string memory version = ISemver(address(_balanceClaimer)).version();
+        console.log("BalanceClaimer version: %s", version);
+
+        ChainAssertions.checkBalanceClaimer({ _contracts: _proxiesUnstrict(), _isProxy: true });
     }
 
     /// @notice Transfer ownership of the DisputeGameFactory contract to the final system owner

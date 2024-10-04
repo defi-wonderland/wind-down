@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { IEthBalanceWithdrawer } from "src/L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
+import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
+
 /// @title IBalanceClaimer
 /// @notice Interface for the BalanceClaimer contract
 interface IBalanceClaimer {
@@ -28,6 +31,8 @@ interface IBalanceClaimer {
     )
         external;
 
+    function initialize(address _ethbalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root) external;
+
     function canClaim(
         bytes32[] calldata _proof,
         address _user,
@@ -44,4 +49,8 @@ interface IBalanceClaimer {
     function root() external view returns (bytes32 _root);
 
     function claimed(address _user) external view returns (bool _claimed);
+
+    function ethBalanceWithdrawer() external view returns (IEthBalanceWithdrawer _ethBalanceWithdrawer);
+
+    function erc20BalanceWithdrawer() external view returns (IErc20BalanceWithdrawer _erc20BalanceWithdrawer);
 }

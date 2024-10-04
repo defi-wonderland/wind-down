@@ -142,7 +142,9 @@ contract Initializer_Test is Bridge_Initializer {
             InitializeableContract({
                 name: "OptimismPortal",
                 target: deploy.mustGetAddress("OptimismPortal"),
-                initCalldata: abi.encodeCall(optimismPortal.initialize, (l2OutputOracle, systemConfig, superchainConfig))
+                initCalldata: abi.encodeCall(
+                    optimismPortal.initialize, (l2OutputOracle, systemConfig, superchainConfig, address(balanceClaimer))
+                )
             })
         );
         // OptimismPortalProxy
@@ -150,7 +152,9 @@ contract Initializer_Test is Bridge_Initializer {
             InitializeableContract({
                 name: "OptimismPortalProxy",
                 target: address(optimismPortal),
-                initCalldata: abi.encodeCall(optimismPortal.initialize, (l2OutputOracle, systemConfig, superchainConfig))
+                initCalldata: abi.encodeCall(
+                    optimismPortal.initialize, (l2OutputOracle, systemConfig, superchainConfig, address(balanceClaimer))
+                )
             })
         );
         // OptimismPortal2Impl
@@ -275,7 +279,8 @@ contract Initializer_Test is Bridge_Initializer {
                 name: "L1StandardBridge",
                 target: deploy.mustGetAddress("L1StandardBridge"),
                 initCalldata: abi.encodeCall(
-                    l1StandardBridge.initialize, (l1CrossDomainMessenger, superchainConfig, systemConfig)
+                    l1StandardBridge.initialize,
+                    (l1CrossDomainMessenger, superchainConfig, systemConfig, address(balanceClaimer))
                 )
             })
         );
@@ -285,7 +290,8 @@ contract Initializer_Test is Bridge_Initializer {
                 name: "L1StandardBridgeProxy",
                 target: address(l1StandardBridge),
                 initCalldata: abi.encodeCall(
-                    l1StandardBridge.initialize, (l1CrossDomainMessenger, superchainConfig, systemConfig)
+                    l1StandardBridge.initialize,
+                    (l1CrossDomainMessenger, superchainConfig, systemConfig, address(balanceClaimer))
                 )
             })
         );

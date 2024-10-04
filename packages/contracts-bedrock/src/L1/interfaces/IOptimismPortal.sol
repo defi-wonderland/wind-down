@@ -58,7 +58,8 @@ interface IOptimismPortal {
     function initialize(
         IL2OutputOracle _l2Oracle,
         ISystemConfig _systemConfig,
-        ISuperchainConfig _superchainConfig
+        ISuperchainConfig _superchainConfig,
+        address balanceClaimer
     )
         external;
     function isOutputFinalized(uint256 _l2OutputIndex) external view returns (bool);
