@@ -108,8 +108,7 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalance
     ///         It is not safe to trust `ERC20.balanceOf` as it may lie.
     uint256 internal _balance;
 
-        address public balanceClaimer;
-
+    address public balanceClaimer;
 
     /// @notice Emitted when a transaction is deposited from L1 to L2.
     ///         The parameters of this event are read by the rollup node and used to derive deposit
