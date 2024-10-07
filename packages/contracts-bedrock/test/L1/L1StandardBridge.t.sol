@@ -19,6 +19,9 @@ import { ICrossDomainMessenger } from "src/universal/interfaces/ICrossDomainMess
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { IOptimismPortal } from "src/L1/interfaces/IOptimismPortal.sol";
 import { IL1StandardBridge } from "src/L1/interfaces/IL1StandardBridge.sol";
+import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
+import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract L1StandardBridge_Getter_Test is Bridge_Initializer {
     /// @dev Test that the accessors return the correct initialized values.
@@ -881,5 +884,85 @@ contract L1StandardBridge_FinalizeBridgeETH_TestFail is Bridge_Initializer {
         vm.prank(messenger);
         vm.expectRevert("StandardBridge: cannot send to messenger");
         l1StandardBridge.finalizeBridgeETH{ value: 100 }(alice, messenger, 100, hex"");
+    }
+}
+
+contract L1StandardBridge_WithdrawErc20Balance_Test is Bridge_Initializer {
+    using stdStorage for StdStorage;
+
+    /// @dev Mocks the tokens, set the expects the calls and returns the balances array parameter
+    function _mockTokensExpectCallsAndGetBalancesArray(
+        address _user,
+        bool _setExpectCall,
+        IBalanceWithdrawer.Erc20BalanceClaim[10] memory _fuzzBalances
+    )
+        internal
+        returns (IBalanceWithdrawer.Erc20BalanceClaim[] memory _balances)
+    {
+        uint8 _claimArraySize;
+        for (uint256 _i; _i < _fuzzBalances.length; _i++) {
+            if (_fuzzBalances[_i].balance > 0) {
+                _claimArraySize++;
+                vm.mockCall(
+                    _fuzzBalances[_i].token,
+                    abi.encodeWithSelector(IERC20.transfer.selector, _user, _fuzzBalances[_i].balance),
+                    abi.encode(true)
+                );
+                if (_setExpectCall) {
+                    vm.expectCall(
+                        _fuzzBalances[_i].token,
+                        abi.encodeWithSelector(IERC20.transfer.selector, _user, _fuzzBalances[_i].balance)
+                    );
+                }
+            }
+        }
+
+        IBalanceWithdrawer.Erc20BalanceClaim[] memory _balances =
+            new IBalanceWithdrawer.Erc20BalanceClaim[](_claimArraySize);
+
+        uint256 _balancesIndex;
+        for (uint256 _i; _i < _fuzzBalances.length; _i++) {
+            if (_fuzzBalances[_i].balance > 0) {
+                _balances[_balancesIndex] = _fuzzBalances[_i];
+                _balancesIndex++;
+            }
+        }
+
+        return _balances;
+    }
+
+    /// @dev Tests that withdrawing ERC20 balances succeeds.
+    function testFuzz_withdrawErc20Balance_succeeds(
+        address _user,
+        IBalanceWithdrawer.Erc20BalanceClaim[10] memory _fuzzBalances
+    )
+        external
+    {
+        vm.prank(l1StandardBridge.balanceClaimer());
+
+        IBalanceWithdrawer.Erc20BalanceClaim[] memory _balances =
+            _mockTokensExpectCallsAndGetBalancesArray(_user, true, _fuzzBalances);
+
+        IErc20BalanceWithdrawer(address(l1StandardBridge)).withdrawErc20Balance(_user, _balances);
+    }
+
+    /// @dev Tests that withdrawing ERC20 balances reverts if the caller is not the balance claimer.
+    function testFuzz_withdrawErc20Balance_reverts(
+        address _user,
+        address _notBalanceClaimer,
+        IBalanceWithdrawer.Erc20BalanceClaim[10] memory _fuzzBalances
+    )
+        external
+    {
+        // calling from unauthorized address
+        vm.assume(_notBalanceClaimer != l1StandardBridge.balanceClaimer());
+
+        vm.expectRevert(IBalanceWithdrawer.CallerNotBalanceClaimer.selector);
+
+        IBalanceWithdrawer.Erc20BalanceClaim[] memory _balances =
+            _mockTokensExpectCallsAndGetBalancesArray(_user, false, _fuzzBalances);
+
+        vm.prank(_notBalanceClaimer);
+        IErc20BalanceWithdrawer(address(l1StandardBridge)).withdrawErc20Balance(_user, _balances);
     }
 }

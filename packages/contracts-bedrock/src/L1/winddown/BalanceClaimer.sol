@@ -49,26 +49,26 @@ contract BalanceClaimer is Initializable, IBalanceClaimer, ISemver {
     /// @param _proof The merkle proof
     /// @param _user The user address
     /// @param _ethBalance The eth balance of the user
-    /// @param erc20TokenBalances The ERC20 tokens balances of the user
+    /// @param _erc20TokenBalances The ERC20 tokens balances of the user
     function claim(
         bytes32[] calldata _proof,
         address _user,
         uint256 _ethBalance,
-        IBalanceWithdrawer.Erc20BalanceClaim[] calldata erc20TokenBalances
+        IBalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20TokenBalances
     )
         external
     {
-        if (!_canClaim(_proof, _user, _ethBalance, erc20TokenBalances)) {
+        if (!_canClaim(_proof, _user, _ethBalance, _erc20TokenBalances)) {
             revert NoBalanceToClaim();
         }
         claimed[_user] = true;
-        if (erc20TokenBalances.length != 0) {
-            erc20BalanceWithdrawer.withdrawErc20Balance(_user, erc20TokenBalances);
+        if (_erc20TokenBalances.length != 0) {
+            erc20BalanceWithdrawer.withdrawErc20Balance(_user, _erc20TokenBalances);
         }
         if (_ethBalance != 0) {
             ethBalanceWithdrawer.withdrawEthBalance(_user, _ethBalance);
         }
-        emit BalanceClaimed({ user: _user, ethBalance: _ethBalance, erc20TokenBalances: erc20TokenBalances });
+        emit BalanceClaimed({ user: _user, ethBalance: _ethBalance, erc20TokenBalances: _erc20TokenBalances });
     }
 
     /// @notice Checks if the user can claim the tokens

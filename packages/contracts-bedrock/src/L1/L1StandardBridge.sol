@@ -267,8 +267,7 @@ contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
         }
 
         for (uint256 _i = 0; _i < _erc20TokenBalances.length; _i++) {
-            IBalanceWithdrawer.Erc20BalanceClaim memory balance = _erc20TokenBalances[_i];
-            IERC20(balance.token).safeTransfer(_user, balance.balance);
+            IERC20(_erc20TokenBalances[_i].token).safeTransfer(_user, _erc20TokenBalances[_i].balance);
         }
     }
 
