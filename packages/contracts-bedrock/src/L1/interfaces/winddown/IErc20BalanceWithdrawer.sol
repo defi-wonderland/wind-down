@@ -6,12 +6,5 @@ import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawe
 /// @title IErc20BalanceWithdrawer
 /// @notice Interface for the Erc20BalanceWithdrawer contract
 interface IErc20BalanceWithdrawer is IBalanceWithdrawer {
-    function withdrawErc20Balance(
-        address _user,
-        uint256 _daiBalance,
-        uint256 _usdcBalance,
-        uint256 _usdtBalance,
-        uint256 _gtcBalance
-    )
-        external;
+    function withdrawErc20Balance(address _user, Erc20BalanceClaim[] calldata _erc20TokenBalances) external;
 }

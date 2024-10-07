@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
 import { IEthBalanceWithdrawer } from "src/L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
 import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
 
@@ -9,12 +10,7 @@ import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20Balanc
 interface IBalanceClaimer {
     /// @notice Emitted when a user claims their balance
     event BalanceClaimed(
-        address indexed user,
-        uint256 daiBalance,
-        uint256 usdcBalance,
-        uint256 usdtBalance,
-        uint256 gtcBalance,
-        uint256 ethBalance
+        address indexed user, uint256 ethBalance, IBalanceWithdrawer.Erc20BalanceClaim[] erc20TokenBalances
     );
 
     /// @notice Thrown when the user has no balance to claim
@@ -23,24 +19,18 @@ interface IBalanceClaimer {
     function claim(
         bytes32[] calldata _proof,
         address _user,
-        uint256 _daiBalance,
-        uint256 _usdcBalance,
-        uint256 _usdtBalance,
-        uint256 _gtcBalance,
-        uint256 _ethBalance
+        uint256 _ethBalance,
+        IBalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20TokenBalances
     )
         external;
 
-    function initialize(address _ethbalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root) external;
+    function initialize(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root) external;
 
     function canClaim(
         bytes32[] calldata _proof,
         address _user,
-        uint256 _daiBalance,
-        uint256 _usdcBalance,
-        uint256 _usdtBalance,
-        uint256 _gtcBalance,
-        uint256 _ethBalance
+        uint256 _ethBalance,
+        IBalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20TokenBalances
     )
         external
         view

@@ -16,6 +16,7 @@ import { ICrossDomainMessenger } from "src/universal/interfaces/ICrossDomainMess
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
 import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
+import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
 
 /// @custom:proxied true
 /// @title L1StandardBridge
@@ -29,11 +30,6 @@ import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20Balanc
 ///         not limited to: tokens with transfer fees, rebasing tokens, and tokens with blocklists.
 contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
     using SafeERC20 for IERC20;
-
-    IERC20 public constant DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    IERC20 public constant USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    IERC20 public constant USDT = IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    IERC20 public constant GTC = IERC20(0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F);
 
     /// @custom:legacy
     /// @notice Emitted whenever a deposit of ETH from L1 into L2 is initiated.
@@ -259,33 +255,20 @@ contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
 
     /// @notice Withdraws the ERC20 balance to the user
     /// @param _user The user address
-    /// @param _daiBalance The DAI balance of the user
-    /// @param _usdcBalance The USDC balance of the user
-    /// @param _usdtBalance The USDT balance of the user
-    /// @param _gtcBalance The GTC balance of the user
+    /// @param _erc20TokenBalances The ERC20 tokens balances
     function withdrawErc20Balance(
         address _user,
-        uint256 _daiBalance,
-        uint256 _usdcBalance,
-        uint256 _usdtBalance,
-        uint256 _gtcBalance
+        IBalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20TokenBalances
     )
         external
     {
         if (msg.sender != balanceClaimer) {
             revert CallerNotBalanceClaimer();
         }
-        if (_daiBalance > 0) {
-            DAI.safeTransfer(_user, _daiBalance);
-        }
-        if (_usdcBalance > 0) {
-            USDC.safeTransfer(_user, _usdcBalance);
-        }
-        if (_usdtBalance > 0) {
-            USDT.safeTransfer(_user, _usdtBalance);
-        }
-        if (_gtcBalance > 0) {
-            GTC.safeTransfer(_user, _gtcBalance);
+
+        for (uint256 _i = 0; _i < _erc20TokenBalances.length; _i++) {
+            IBalanceWithdrawer.Erc20BalanceClaim memory balance = _erc20TokenBalances[_i];
+            IERC20(balance.token).safeTransfer(_user, balance.balance);
         }
     }
 
