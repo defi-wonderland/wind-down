@@ -107,7 +107,7 @@ contract BalanceClaimer is Initializable, IBalanceClaimer, ISemver {
         returns (bool _canClaimTokens)
     {
         if (claimed[_user]) return false;
-        bytes32 _leaf = keccak256(bytes.concat(keccak256(abi.encode(_user, _erc20TokenBalances, _ethBalance))));
+        bytes32 _leaf = keccak256(bytes.concat(keccak256(abi.encode(_user, _ethBalance, _erc20TokenBalances))));
         _canClaimTokens = MerkleProof.verify(_proof, root, _leaf);
     }
 }
