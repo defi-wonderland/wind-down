@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 // Testing
 import { stdError } from "forge-std/Test.sol";
+import { stdStorage, StdStorage } from "forge-std/Test.sol";
 import { VmSafe } from "forge-std/Vm.sol";
 import { MockERC20 } from "solmate/test/utils/mocks/MockERC20.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
@@ -27,6 +28,7 @@ import { IL2OutputOracle } from "src/L1/interfaces/IL2OutputOracle.sol";
 import { IL1Block } from "src/L2/interfaces/IL1Block.sol";
 import { IOptimismPortal } from "src/L1/interfaces/IOptimismPortal.sol";
 import { IProxy } from "src/universal/interfaces/IProxy.sol";
+import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
 
 contract OptimismPortal_Test is CommonTest {
     address depositor;
@@ -51,12 +53,13 @@ contract OptimismPortal_Test is CommonTest {
         assertEq(prevBaseFee, 1 gwei);
         assertEq(prevBoughtGas, 0);
         assertEq(prevBlockNum, uint64(block.number));
+        assertEq(opImpl.balanceClaimer(), address(0));
     }
 
     /// @dev Tests that the initializer sets the correct values.
     /// @notice Marked virtual to be overridden in
     ///         test/kontrol/deployment/DeploymentSummary.t.sol
-    function test_initialize_succeeds() external virtual {
+    function test_initialize_succeeds1() external virtual {
         address guardian = deploy.cfg().superchainConfigGuardian();
         assertEq(address(optimismPortal.l2Oracle()), address(l2OutputOracle));
         assertEq(address(optimismPortal.systemConfig()), address(systemConfig));
@@ -68,6 +71,7 @@ contract OptimismPortal_Test is CommonTest {
         assertEq(prevBaseFee, 1 gwei);
         assertEq(prevBoughtGas, 0);
         assertEq(prevBlockNum, uint64(block.number));
+        assertEq(optimismPortal.balanceClaimer(), address(balanceClaimer));
     }
 
     /// @dev Tests that `pause` successfully pauses
@@ -1593,5 +1597,48 @@ contract OptimismPortalWithMockERC20_Test is OptimismPortal_FinalizeWithdrawal_T
 
         // Deposit the token into the portal
         optimismPortal.depositTransaction{ value: 100 }(address(0), 0, 0, false, "");
+    }
+}
+
+contract OptimismPortal_WithdrawEthBalance_Test is CommonTest {
+    using stdStorage for StdStorage;
+
+    /// @dev Check if an address is a contract
+    function _isContract(address _addr) internal view returns (bool) {
+        uint256 _size;
+        assembly {
+            _size := extcodesize(_addr)
+        }
+        return _size > 0;
+    }
+
+    /// @dev Tests that `withdrawEthBalance` succeeds when the balance claimer is the caller.
+    function testFuzz_withdrawEthBalance_succeeds(address _user, uint256 _balance) external {
+        vm.assume(!_isContract(_user));
+        vm.deal(address(optimismPortal), _balance);
+
+        vm.prank(optimismPortal.balanceClaimer());
+        optimismPortal.withdrawEthBalance(_user, _balance);
+
+        assertEq(address(optimismPortal).balance, 0);
+        assertEq(address(_user).balance, _balance);
+    }
+
+    /// @dev Tests that `withdrawEthBalance` reverts when the balance claimer is not the caller.
+    function testFuzz_withdrawEthBalance_reverts(
+        address _user,
+        address _notBalanceClaimer,
+        uint256 _balance
+    )
+        external
+    {
+        vm.assume(_notBalanceClaimer != optimismPortal.balanceClaimer());
+        vm.assume(!_isContract(_user));
+        vm.deal(address(optimismPortal), _balance);
+
+        vm.expectRevert(IBalanceWithdrawer.CallerNotBalanceClaimer.selector);
+
+        vm.prank(_notBalanceClaimer);
+        optimismPortal.withdrawEthBalance(_user, _balance);
     }
 }

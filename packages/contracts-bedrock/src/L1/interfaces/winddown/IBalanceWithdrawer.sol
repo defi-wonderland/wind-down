@@ -12,4 +12,6 @@ interface IBalanceWithdrawer {
 
     /// @notice Thrown when the caller is not the BalanceClaimer contract
     error CallerNotBalanceClaimer();
+
+    function balanceClaimer() external view returns (address);
 }

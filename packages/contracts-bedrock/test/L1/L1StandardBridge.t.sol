@@ -49,6 +49,7 @@ contract L1StandardBridge_Initialize_Test is Bridge_Initializer {
         assertEq(address(impl.otherBridge()), Predeploys.L2_STANDARD_BRIDGE);
         assertEq(address(l2StandardBridge), Predeploys.L2_STANDARD_BRIDGE);
         assertEq(address(impl.systemConfig()), address(0));
+        assertEq(address(impl.balanceClaimer()), address(0));
     }
 
     /// @dev Test that the initialize function sets the correct values.
@@ -60,6 +61,7 @@ contract L1StandardBridge_Initialize_Test is Bridge_Initializer {
         assertEq(address(l1StandardBridge.otherBridge()), Predeploys.L2_STANDARD_BRIDGE);
         assertEq(address(l2StandardBridge), Predeploys.L2_STANDARD_BRIDGE);
         assertEq(address(l1StandardBridge.systemConfig()), address(systemConfig));
+        assertEq(address(l1StandardBridge.balanceClaimer()), address(balanceClaimer));
     }
 }
 
@@ -917,8 +919,7 @@ contract L1StandardBridge_WithdrawErc20Balance_Test is Bridge_Initializer {
             }
         }
 
-        IBalanceWithdrawer.Erc20BalanceClaim[] memory _balances =
-            new IBalanceWithdrawer.Erc20BalanceClaim[](_claimArraySize);
+        _balances = new IBalanceWithdrawer.Erc20BalanceClaim[](_claimArraySize);
 
         uint256 _balancesIndex;
         for (uint256 _i; _i < _fuzzBalances.length; _i++) {
@@ -927,8 +928,6 @@ contract L1StandardBridge_WithdrawErc20Balance_Test is Bridge_Initializer {
                 _balancesIndex++;
             }
         }
-
-        return _balances;
     }
 
     /// @dev Tests that withdrawing ERC20 balances succeeds.

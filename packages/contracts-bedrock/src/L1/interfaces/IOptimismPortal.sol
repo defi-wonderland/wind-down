@@ -5,8 +5,9 @@ import { Types } from "src/libraries/Types.sol";
 import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { IL2OutputOracle } from "src/L1/interfaces/IL2OutputOracle.sol";
+import { IEthBalanceWithdrawer } from "src/L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
 
-interface IOptimismPortal {
+interface IOptimismPortal is IEthBalanceWithdrawer {
     error BadTarget();
     error CallPaused();
     error ContentLengthMismatch();
