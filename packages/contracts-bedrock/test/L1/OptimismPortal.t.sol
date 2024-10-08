@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 // Testing
 import { stdError } from "forge-std/Test.sol";
-import { stdStorage, StdStorage } from "forge-std/Test.sol";
 import { VmSafe } from "forge-std/Vm.sol";
 import { MockERC20 } from "solmate/test/utils/mocks/MockERC20.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
@@ -1601,8 +1600,6 @@ contract OptimismPortalWithMockERC20_Test is OptimismPortal_FinalizeWithdrawal_T
 }
 
 contract OptimismPortal_WithdrawEthBalance_Test is CommonTest {
-    using stdStorage for StdStorage;
-
     /// @dev Check if an address is a contract
     function _isContract(address _addr) internal view returns (bool) {
         uint256 _size;
