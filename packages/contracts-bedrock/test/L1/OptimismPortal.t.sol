@@ -58,7 +58,7 @@ contract OptimismPortal_Test is CommonTest {
     /// @dev Tests that the initializer sets the correct values.
     /// @notice Marked virtual to be overridden in
     ///         test/kontrol/deployment/DeploymentSummary.t.sol
-    function test_initialize_succeeds1() external virtual {
+    function test_initialize_succeeds() external virtual {
         address guardian = deploy.cfg().superchainConfigGuardian();
         assertEq(address(optimismPortal.l2Oracle()), address(l2OutputOracle));
         assertEq(address(optimismPortal.systemConfig()), address(systemConfig));

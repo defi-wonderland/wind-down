@@ -1371,6 +1371,8 @@ contract Deploy is Deployer {
         address optimismPortalProxy = mustGetAddress("OptimismPortalProxy");
         address l1StandardBridgeProxy = mustGetAddress("L1StandardBridgeProxy");
 
+        // TODO: Set the correct merkle root
+        // Test merkle root!
         bytes32 _merkleRoot = bytes32(0);
 
         IProxyAdmin proxyAdmin = IProxyAdmin(payable(mustGetAddress("ProxyAdmin")));
