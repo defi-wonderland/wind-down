@@ -215,6 +215,10 @@ contract BalanceClaimer_CanClaim_Test is BalanceClaimer_Test {
 }
 
 contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
+    event BalanceClaimed(
+        address indexed user, uint256 ethBalance, IBalanceWithdrawer.Erc20BalanceClaim[] erc20TokenBalances
+    );
+
     /// @dev Test that the canClaim function returns true when the user is a legit claimer.
     function testFuzz_Claim_succeeds(ClaimData[3] memory _claimData) external {
         bytes32[] memory _leaves = _getLeaves(_claimData);
@@ -222,21 +226,22 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
         bytes32[] memory _tree = _mockRoot(_leaves);
 
         for (uint256 _i = 0; _i < _claimData.length; _i++) {
-            _mockErc20BalanceWithdrawCallAndSetExpectCall(
-                _users[_i],
-                _getErc20TokenBalances(
-                    _claimData[_i].balanceToken1, _claimData[_i].balanceToken2, _claimData[_i].balanceToken3
-                )
+            IBalanceWithdrawer.Erc20BalanceClaim[] memory _erc20TokenBalances = _getErc20TokenBalances(
+                _claimData[_i].balanceToken1, _claimData[_i].balanceToken2, _claimData[_i].balanceToken3
             );
+            _mockErc20BalanceWithdrawCallAndSetExpectCall(_users[_i], _erc20TokenBalances);
             _mockEthBalanceWithdrawCallAndSetExpectCall(_users[_i], _claimData[_i].ethBalance);
+
+            vm.expectEmit(address(balanceClaimer));
+            emit BalanceClaimed(_users[_i], _claimData[_i].ethBalance, _erc20TokenBalances);
+
             balanceClaimer.claim(
                 merkleTreeGenerator.getProof(_tree, merkleTreeGenerator.getIndex(_tree, _leaves[_i])),
                 _users[_i],
                 _claimData[_i].ethBalance,
-                _getErc20TokenBalances(
-                    _claimData[_i].balanceToken1, _claimData[_i].balanceToken2, _claimData[_i].balanceToken3
-                )
+                _erc20TokenBalances
             );
+            assertTrue(balanceClaimer.claimed(_users[_i]));
         }
     }
 
@@ -255,6 +260,29 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
 
             vm.expectRevert(IBalanceClaimer.NoBalanceToClaim.selector);
             balanceClaimer.claim(_proof, makeAddr("random"), _claimData[_i].ethBalance, _erc20TokenBalances);
+        }
+    }
+
+    /// @dev Test that the canClaim function can be only called once when the user is a legit claimer.
+    function testFuzz_ClaimTwice_reverts(ClaimData[3] memory _claimData) external {
+        bytes32[] memory _leaves = _getLeaves(_claimData);
+
+        bytes32[] memory _tree = _mockRoot(_leaves);
+
+        for (uint256 _i = 0; _i < _claimData.length; _i++) {
+            IBalanceWithdrawer.Erc20BalanceClaim[] memory _erc20TokenBalances = _getErc20TokenBalances(
+                _claimData[_i].balanceToken1, _claimData[_i].balanceToken2, _claimData[_i].balanceToken3
+            );
+            bytes32[] memory _proof =
+                merkleTreeGenerator.getProof(_tree, merkleTreeGenerator.getIndex(_tree, _leaves[_i]));
+            _mockErc20BalanceWithdrawCallAndSetExpectCall(_users[_i], _erc20TokenBalances);
+            _mockEthBalanceWithdrawCallAndSetExpectCall(_users[_i], _claimData[_i].ethBalance);
+
+            balanceClaimer.claim(_proof, _users[_i], _claimData[_i].ethBalance, _erc20TokenBalances);
+            assertTrue(balanceClaimer.claimed(_users[_i]));
+
+            vm.expectRevert(IBalanceClaimer.NoBalanceToClaim.selector);
+            balanceClaimer.claim(_proof, _users[_i], _claimData[_i].ethBalance, _erc20TokenBalances);
         }
     }
 }
