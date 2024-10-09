@@ -390,6 +390,31 @@ contract Initializer_Test is Bridge_Initializer {
             })
         );
 
+        // BalanceClaimerImpl
+        contracts.push(
+            InitializeableContract({
+                name: "BalanceClaimer",
+                target: deploy.mustGetAddress("BalanceClaimer"),
+                initCalldata: abi.encodeCall(
+                    balanceClaimer.initialize,
+                    // TODO: set merkle root
+                    (address(optimismPortal), address(l1StandardBridge), bytes32(0))
+                )
+            })
+        );
+        // L1StandardBridgeProxy
+        contracts.push(
+            InitializeableContract({
+                name: "BalanceClaimerProxy",
+                target: address(balanceClaimer),
+                initCalldata: abi.encodeCall(
+                    balanceClaimer.initialize,
+                    // TODO: set merkle root
+                    (address(optimismPortal), address(l1StandardBridge), bytes32(0))
+                )
+            })
+        );
+
         // Nicknamed contracts.
         nicknames["OptimismPortal2Proxy"] = "OptimismPortalProxy";
     }
