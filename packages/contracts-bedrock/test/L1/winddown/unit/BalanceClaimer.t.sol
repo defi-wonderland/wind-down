@@ -220,7 +220,7 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
     );
 
     /// @dev Test that the canClaim function returns true when the user is a legit claimer.
-    function testFuzz_Claim_succeeds(ClaimData[3] memory _claimData) external {
+    function testFuzz_claim_succeeds(ClaimData[3] memory _claimData) external {
         bytes32[] memory _leaves = _getLeaves(_claimData);
 
         bytes32[] memory _tree = _mockRoot(_leaves);
@@ -246,7 +246,7 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
     }
 
     /// @dev Test that the claim function reverts when the user is not a legit claimer.
-    function testFuzz_Claim_reverts(ClaimData[3] memory _claimData) external {
+    function testFuzz_claim_reverts(ClaimData[3] memory _claimData) external {
         bytes32[] memory _leaves = _getLeaves(_claimData);
 
         bytes32[] memory _tree = _mockRoot(_leaves);
@@ -264,7 +264,7 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
     }
 
     /// @dev Test that the canClaim function can be only called once when the user is a legit claimer.
-    function testFuzz_ClaimTwice_reverts(ClaimData[3] memory _claimData) external {
+    function testFuzz_claimTwice_reverts(ClaimData[3] memory _claimData) external {
         bytes32[] memory _leaves = _getLeaves(_claimData);
 
         bytes32[] memory _tree = _mockRoot(_leaves);

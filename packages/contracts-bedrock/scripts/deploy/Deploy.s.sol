@@ -386,7 +386,6 @@ contract Deploy is Deployer {
         deployOptimismMintableERC20Factory();
         deploySystemConfig();
 
-        // Deploy Balance claimer required by L1StandardBridge and OptimismPortal
         deployBalanceClaimer();
 
         deployL1StandardBridge();
@@ -409,6 +408,7 @@ contract Deploy is Deployer {
         deploySystemConfigInterop();
         deployL1StandardBridge();
         deployL1ERC721Bridge();
+        deployBalanceClaimer();
 
         // Fault proofs
         deployOptimismPortalInterop();
