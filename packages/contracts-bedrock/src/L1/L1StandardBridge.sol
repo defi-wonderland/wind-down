@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 // Contracts
 import { StandardBridge } from "src/universal/StandardBridge.sol";
 
@@ -12,6 +15,7 @@ import { ISemver } from "src/universal/interfaces/ISemver.sol";
 import { ICrossDomainMessenger } from "src/universal/interfaces/ICrossDomainMessenger.sol";
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
+import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
 
 /// @custom:proxied true
 /// @title L1StandardBridge
@@ -24,6 +28,8 @@ import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
 ///         of some token types that may not be properly supported by this contract include, but are
 ///         not limited to: tokens with transfer fees, rebasing tokens, and tokens with blocklists.
 contract L1StandardBridge is StandardBridge, ISemver {
+    using SafeERC20 for IERC20;
+
     /// @custom:legacy
     /// @notice Emitted whenever a deposit of ETH from L1 into L2 is initiated.
     /// @param from      Address of the depositor.
@@ -75,8 +81,9 @@ contract L1StandardBridge is StandardBridge, ISemver {
     );
 
     /// @notice Semantic version.
-    /// @custom:semver 2.2.1-beta.1
-    string public constant version = "2.2.1-beta.1";
+    /// @custom:semver 2.3.1-beta.1
+    // TODO: check version set
+    string public constant version = "2.3.1-beta.1";
 
     /// @notice Address of the SuperchainConfig contract.
     ISuperchainConfig public superchainConfig;
@@ -84,22 +91,28 @@ contract L1StandardBridge is StandardBridge, ISemver {
     /// @notice Address of the SystemConfig contract.
     ISystemConfig public systemConfig;
 
+    address public balanceClaimer;
+
     /// @notice Constructs the L1StandardBridge contract.
     constructor() StandardBridge() {
         initialize({
             _messenger: ICrossDomainMessenger(address(0)),
             _superchainConfig: ISuperchainConfig(address(0)),
-            _systemConfig: ISystemConfig(address(0))
+            _systemConfig: ISystemConfig(address(0)),
+            _balanceClaimer: address(0)
         });
     }
 
     /// @notice Initializer.
     /// @param _messenger        Contract for the CrossDomainMessenger on this network.
     /// @param _superchainConfig Contract for the SuperchainConfig on this network.
+    /// @param _systemConfig     Contract for the SystemConfig on this network.
+    /// @param _balanceClaimer   Address of the balance claimer.
     function initialize(
         ICrossDomainMessenger _messenger,
         ISuperchainConfig _superchainConfig,
-        ISystemConfig _systemConfig
+        ISystemConfig _systemConfig,
+        address _balanceClaimer
     )
         public
         initializer
@@ -110,6 +123,7 @@ contract L1StandardBridge is StandardBridge, ISemver {
             _messenger: _messenger,
             _otherBridge: StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE))
         });
+        balanceClaimer = _balanceClaimer;
     }
 
     /// @inheritdoc StandardBridge
@@ -236,6 +250,24 @@ contract L1StandardBridge is StandardBridge, ISemver {
         external
     {
         finalizeBridgeERC20(_l1Token, _l2Token, _from, _to, _amount, _extraData);
+    }
+
+    /// @notice Withdraws the ERC20 balance to the user
+    /// @param _user The user address
+    /// @param _erc20TokenBalances The ERC20 tokens balances
+    function withdrawErc20Balance(
+        address _user,
+        IBalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20TokenBalances
+    )
+        external
+    {
+        if (msg.sender != balanceClaimer) {
+            revert IBalanceWithdrawer.CallerNotBalanceClaimer();
+        }
+
+        for (uint256 _i = 0; _i < _erc20TokenBalances.length; _i++) {
+            IERC20(_erc20TokenBalances[_i].token).safeTransfer(_user, _erc20TokenBalances[_i].balance);
+        }
     }
 
     /// @custom:legacy

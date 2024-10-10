@@ -5,8 +5,10 @@ import { IStandardBridge } from "src/universal/interfaces/IStandardBridge.sol";
 import { ICrossDomainMessenger } from "src/universal/interfaces/ICrossDomainMessenger.sol";
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
+import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
+import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
 
-interface IL1StandardBridge is IStandardBridge {
+interface IL1StandardBridge is IStandardBridge, IErc20BalanceWithdrawer {
     event ERC20DepositInitiated(
         address indexed l1Token,
         address indexed l2Token,
@@ -65,7 +67,8 @@ interface IL1StandardBridge is IStandardBridge {
     function initialize(
         ICrossDomainMessenger _messenger,
         ISuperchainConfig _superchainConfig,
-        ISystemConfig _systemConfig
+        ISystemConfig _systemConfig,
+        address _balanceClaimer
     )
         external;
     function l2TokenBridge() external view returns (address);

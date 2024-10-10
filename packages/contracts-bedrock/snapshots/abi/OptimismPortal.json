@@ -22,6 +22,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "balanceClaimer",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -191,6 +204,11 @@
       {
         "internalType": "contract ISuperchainConfig",
         "name": "_superchainConfig",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_balanceClaimer",
         "type": "address"
       }
     ],
@@ -478,6 +496,24 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_ethBalance",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawEthBalance",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
@@ -577,12 +613,22 @@
   },
   {
     "inputs": [],
+    "name": "CallerNotBalanceClaimer",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ContentLengthMismatch",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "EmptyItem",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EthTransferFailed",
     "type": "error"
   },
   {

@@ -5,8 +5,9 @@ import { Types } from "src/libraries/Types.sol";
 import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { IL2OutputOracle } from "src/L1/interfaces/IL2OutputOracle.sol";
+import { IEthBalanceWithdrawer } from "src/L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
 
-interface IOptimismPortal {
+interface IOptimismPortal is IEthBalanceWithdrawer {
     error BadTarget();
     error CallPaused();
     error ContentLengthMismatch();
@@ -58,7 +59,8 @@ interface IOptimismPortal {
     function initialize(
         IL2OutputOracle _l2Oracle,
         ISystemConfig _systemConfig,
-        ISuperchainConfig _superchainConfig
+        ISuperchainConfig _superchainConfig,
+        address _balanceClaimer
     )
         external;
     function isOutputFinalized(uint256 _l2OutputIndex) external view returns (bool);

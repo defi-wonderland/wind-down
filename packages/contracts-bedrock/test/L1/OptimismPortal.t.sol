@@ -27,6 +27,7 @@ import { IL2OutputOracle } from "src/L1/interfaces/IL2OutputOracle.sol";
 import { IL1Block } from "src/L2/interfaces/IL1Block.sol";
 import { IOptimismPortal } from "src/L1/interfaces/IOptimismPortal.sol";
 import { IProxy } from "src/universal/interfaces/IProxy.sol";
+import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
 
 contract OptimismPortal_Test is CommonTest {
     address depositor;
@@ -51,6 +52,7 @@ contract OptimismPortal_Test is CommonTest {
         assertEq(prevBaseFee, 1 gwei);
         assertEq(prevBoughtGas, 0);
         assertEq(prevBlockNum, uint64(block.number));
+        assertEq(opImpl.balanceClaimer(), address(0));
     }
 
     /// @dev Tests that the initializer sets the correct values.
@@ -68,6 +70,7 @@ contract OptimismPortal_Test is CommonTest {
         assertEq(prevBaseFee, 1 gwei);
         assertEq(prevBoughtGas, 0);
         assertEq(prevBlockNum, uint64(block.number));
+        assertEq(optimismPortal.balanceClaimer(), address(balanceClaimer));
     }
 
     /// @dev Tests that `pause` successfully pauses
@@ -1593,5 +1596,46 @@ contract OptimismPortalWithMockERC20_Test is OptimismPortal_FinalizeWithdrawal_T
 
         // Deposit the token into the portal
         optimismPortal.depositTransaction{ value: 100 }(address(0), 0, 0, false, "");
+    }
+}
+
+contract OptimismPortal_WithdrawEthBalance_Test is CommonTest {
+    /// @dev Check if an address is a contract
+    function _isContract(address _addr) internal view returns (bool) {
+        uint256 _size;
+        assembly {
+            _size := extcodesize(_addr)
+        }
+        return _size > 0;
+    }
+
+    /// @dev Tests that `withdrawEthBalance` succeeds when the balance claimer is the caller.
+    function testFuzz_withdrawEthBalance_succeeds(address _user, uint256 _balance) external {
+        vm.assume(!_isContract(_user));
+        vm.deal(address(optimismPortal), _balance);
+
+        vm.prank(optimismPortal.balanceClaimer());
+        optimismPortal.withdrawEthBalance(_user, _balance);
+
+        assertEq(address(optimismPortal).balance, 0);
+        assertEq(address(_user).balance, _balance);
+    }
+
+    /// @dev Tests that `withdrawEthBalance` reverts when the balance claimer is not the caller.
+    function testFuzz_withdrawEthBalance_reverts(
+        address _user,
+        address _notBalanceClaimer,
+        uint256 _balance
+    )
+        external
+    {
+        vm.assume(_notBalanceClaimer != optimismPortal.balanceClaimer());
+        vm.assume(!_isContract(_user));
+        vm.deal(address(optimismPortal), _balance);
+
+        vm.expectRevert(IBalanceWithdrawer.CallerNotBalanceClaimer.selector);
+
+        vm.prank(_notBalanceClaimer);
+        optimismPortal.withdrawEthBalance(_user, _balance);
     }
 }

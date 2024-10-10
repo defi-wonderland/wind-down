@@ -24,6 +24,8 @@ import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
 import { IResourceMetering } from "src/L1/interfaces/IResourceMetering.sol";
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { IL1Block } from "src/L2/interfaces/IL1Block.sol";
+import { IEthBalanceWithdrawer } from "src/L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
+import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
 
 /// @custom:proxied true
 /// @title OptimismPortal
@@ -107,6 +109,8 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver {
     ///         It is not safe to trust `ERC20.balanceOf` as it may lie.
     uint256 internal _balance;
 
+    address public balanceClaimer;
+
     /// @notice Emitted when a transaction is deposited from L1 to L2.
     ///         The parameters of this event are read by the rollup node and used to derive deposit
     ///         transactions on L2.
@@ -134,9 +138,10 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 2.8.1-beta.3
+    /// @custom:semver 2.9.1-beta.1
     function version() public pure virtual returns (string memory) {
-        return "2.8.1-beta.3";
+        // TODO: check version set
+        return "2.9.1-beta.1";
     }
 
     /// @notice Constructs the OptimismPortal contract.
@@ -144,7 +149,8 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver {
         initialize({
             _l2Oracle: IL2OutputOracle(address(0)),
             _systemConfig: ISystemConfig(address(0)),
-            _superchainConfig: ISuperchainConfig(address(0))
+            _superchainConfig: ISuperchainConfig(address(0)),
+            _balanceClaimer: address(0)
         });
     }
 
@@ -152,10 +158,12 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver {
     /// @param _l2Oracle Contract of the L2OutputOracle.
     /// @param _systemConfig Contract of the SystemConfig.
     /// @param _superchainConfig Contract of the SuperchainConfig.
+    /// @param _balanceClaimer Address of the balance claimer.
     function initialize(
         IL2OutputOracle _l2Oracle,
         ISystemConfig _systemConfig,
-        ISuperchainConfig _superchainConfig
+        ISuperchainConfig _superchainConfig,
+        address _balanceClaimer
     )
         public
         initializer
@@ -166,6 +174,7 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver {
         if (l2Sender == address(0)) {
             l2Sender = Constants.DEFAULT_L2_SENDER;
         }
+        balanceClaimer = _balanceClaimer;
         __ResourceMetering_init();
     }
 
@@ -217,6 +226,17 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver {
     ///         Optimism system and Bedrock.
     function donateETH() external payable {
         // Intentionally empty.
+    }
+
+    /// @notice Withdraws user eth balance
+    /// @param _user The user address
+    /// @param _ethBalance The eth balance of the user
+    function withdrawEthBalance(address _user, uint256 _ethBalance) external {
+        if (msg.sender != balanceClaimer) revert IBalanceWithdrawer.CallerNotBalanceClaimer();
+        (bool success,) = _user.call{ value: _ethBalance }("");
+        if (!success) {
+            revert IEthBalanceWithdrawer.EthTransferFailed();
+        }
     }
 
     /// @notice Returns the gas paying token and its decimals.

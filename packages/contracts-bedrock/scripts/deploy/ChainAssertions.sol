@@ -29,6 +29,7 @@ import { ProtocolVersion, IProtocolVersions } from "src/L1/interfaces/IProtocolV
 import { IDisputeGameFactory } from "src/dispute/interfaces/IDisputeGameFactory.sol";
 import { IDelayedWETH } from "src/dispute/interfaces/IDelayedWETH.sol";
 import { IOptimismMintableERC20Factory } from "src/universal/interfaces/IOptimismMintableERC20Factory.sol";
+import { IBalanceClaimer } from "src/L1/interfaces/winddown/IBalanceClaimer.sol";
 
 library ChainAssertions {
     Vm internal constant vm = Vm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
@@ -174,6 +175,22 @@ library ChainAssertions {
             require(address(bridge.OTHER_BRIDGE()) == Predeploys.L2_STANDARD_BRIDGE);
             require(address(bridge.otherBridge()) == Predeploys.L2_STANDARD_BRIDGE);
             require(address(bridge.superchainConfig()) == address(0));
+        }
+    }
+
+    /// @notice Asserts that the BalanceClaimer is setup correctly
+    function checkBalanceClaimer(Types.ContractSet memory _contracts, bool _isProxy) internal view {
+        console.log("Running chain assertions on the BalanceClaimer");
+        IBalanceClaimer claimer = IBalanceClaimer(_contracts.BalanceClaimer);
+
+        assertSlotValueIsOne({ _contractAddress: address(claimer), _slot: 0, _offset: 0 });
+
+        if (_isProxy) {
+            require(address(claimer.ethBalanceWithdrawer()) == address(_contracts.OptimismPortal));
+            require(address(claimer.erc20BalanceWithdrawer()) == address(_contracts.L1StandardBridge));
+        } else {
+            require(address(claimer.ethBalanceWithdrawer()) == address(0));
+            require(address(claimer.erc20BalanceWithdrawer()) == address(0));
         }
     }
 

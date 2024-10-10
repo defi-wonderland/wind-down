@@ -507,7 +507,6 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
         deployOPChain.run(doi, doo);
 
         // TODO Add fault proof contract assertions below once OPCM fully supports them.
-
         // Assert that individual input fields were properly set based on the inputs.
         assertEq(opChainProxyAdminOwner, doi.opChainProxyAdminOwner(), "100");
         assertEq(systemConfigOwner, doi.systemConfigOwner(), "200");

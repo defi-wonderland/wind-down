@@ -35,6 +35,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "balanceClaimer",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -430,6 +443,11 @@
         "internalType": "contract ISystemConfig",
         "name": "_systemConfig",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_balanceClaimer",
+        "type": "address"
       }
     ],
     "name": "initialize",
@@ -526,6 +544,36 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "balance",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IBalanceWithdrawer.Erc20BalanceClaim[]",
+        "name": "_erc20TokenBalances",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "withdrawErc20Balance",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -836,5 +884,10 @@
     ],
     "name": "Initialized",
     "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "CallerNotBalanceClaimer",
+    "type": "error"
   }
 ]
