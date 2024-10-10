@@ -15,7 +15,6 @@ import { ISemver } from "src/universal/interfaces/ISemver.sol";
 import { ICrossDomainMessenger } from "src/universal/interfaces/ICrossDomainMessenger.sol";
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
-import { IErc20BalanceWithdrawer } from "src/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
 import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
 
 /// @custom:proxied true
@@ -28,7 +27,7 @@ import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawe
 ///         NOTE: this contract is not intended to support all variations of ERC20 tokens. Examples
 ///         of some token types that may not be properly supported by this contract include, but are
 ///         not limited to: tokens with transfer fees, rebasing tokens, and tokens with blocklists.
-contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
+contract L1StandardBridge is StandardBridge, ISemver {
     using SafeERC20 for IERC20;
 
     /// @custom:legacy
@@ -82,9 +81,9 @@ contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
     );
 
     /// @notice Semantic version.
-    /// @custom:semver 2.2.1-beta.1
-    // TODO: update version
-    string public constant version = "2.2.1-beta.1";
+    /// @custom:semver 2.3.1-beta.1
+    // TODO: check version set
+    string public constant version = "2.3.1-beta.1";
 
     /// @notice Address of the SuperchainConfig contract.
     ISuperchainConfig public superchainConfig;
@@ -263,7 +262,7 @@ contract L1StandardBridge is StandardBridge, ISemver, IErc20BalanceWithdrawer {
         external
     {
         if (msg.sender != balanceClaimer) {
-            revert CallerNotBalanceClaimer();
+            revert IBalanceWithdrawer.CallerNotBalanceClaimer();
         }
 
         for (uint256 _i = 0; _i < _erc20TokenBalances.length; _i++) {

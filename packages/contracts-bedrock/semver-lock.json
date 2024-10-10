@@ -24,8 +24,8 @@
     "sourceCodeHash": "0xcb125e7f640cf5f372c7bf4f8e36150328914ceef99b6fd5d65ae12b6db430b5"
   },
   "src/L1/L1StandardBridge.sol": {
-    "initCodeHash": "0x2868b09ecbe9f2bbc885605c2886b4c79f1c8e4171626c63776603b1b84698a8",
-    "sourceCodeHash": "0xc03da137b3ea72e0109fb284229283b21a0303104afbe37d2fe86ad806392a7f"
+    "initCodeHash": "0x83210c3b7d9050cfeb6dc1d56e662f7c576f86c7b8371160c2e2bbff5d86ea55",
+    "sourceCodeHash": "0xf5c3d1b8731e45d3b37416d5763a749faf40b03b0d947097d050a8534643c869"
   },
   "src/L1/L2OutputOracle.sol": {
     "initCodeHash": "0x433fac9de52d8ce8fc3471b78ef6cc9cff1019f480c9ad91b6e09ab8738a8edb",
@@ -36,8 +36,8 @@
     "sourceCodeHash": "0x7bfa6eff76176649fe600303cd60009a0f6e282cbaec55836b5ea1f8875cbeb5"
   },
   "src/L1/OptimismPortal.sol": {
-    "initCodeHash": "0xbe2c0c81b3459014f287d8c89cdc0d27dde5d1f44e5d024fa1e4773ddc47c190",
-    "sourceCodeHash": "0xb3dd8068477dd304ef1562acf69c2ce460b08cc36aef53b5bbe489fd7d992104"
+    "initCodeHash": "0xdacdc6fc1ccafb3d4dc8efe5bb52d3319b63063f9f4874ed03e26a0d2214ee10",
+    "sourceCodeHash": "0x2ee0e4e493d7676702306d17eefb601adbe8bf17ddf10d60aaad16ccdefbcff4"
   },
   "src/L1/OptimismPortal2.sol": {
     "initCodeHash": "0xc94c609e04ab8ffee880806550dffff53478dfffdfb079f7c487abe0e2996f3c",

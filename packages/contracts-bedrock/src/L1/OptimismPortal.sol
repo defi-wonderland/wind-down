@@ -25,13 +25,14 @@ import { IResourceMetering } from "src/L1/interfaces/IResourceMetering.sol";
 import { ISuperchainConfig } from "src/L1/interfaces/ISuperchainConfig.sol";
 import { IL1Block } from "src/L2/interfaces/IL1Block.sol";
 import { IEthBalanceWithdrawer } from "src/L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
+import { IBalanceWithdrawer } from "src/L1/interfaces/winddown/IBalanceWithdrawer.sol";
 
 /// @custom:proxied true
 /// @title OptimismPortal
 /// @notice The OptimismPortal is a low-level contract responsible for passing messages between L1
 ///         and L2. Messages sent directly to the OptimismPortal have no form of replayability.
 ///         Users are encouraged to use the L1CrossDomainMessenger for a higher-level interface.
-contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalanceWithdrawer {
+contract OptimismPortal is Initializable, ResourceMetering, ISemver {
     /// @notice Allows for interactions with non standard ERC20 tokens.
     using SafeERC20 for IERC20;
 
@@ -137,10 +138,10 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalance
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 2.8.1-beta.3
+    /// @custom:semver 2.9.1-beta.1
     function version() public pure virtual returns (string memory) {
-        // TODO: update version
-        return "2.8.1-beta.3";
+        // TODO: check version set
+        return "2.9.1-beta.1";
     }
 
     /// @notice Constructs the OptimismPortal contract.
@@ -231,10 +232,10 @@ contract OptimismPortal is Initializable, ResourceMetering, ISemver, IEthBalance
     /// @param _user The user address
     /// @param _ethBalance The eth balance of the user
     function withdrawEthBalance(address _user, uint256 _ethBalance) external {
-        if (msg.sender != balanceClaimer) revert CallerNotBalanceClaimer();
+        if (msg.sender != balanceClaimer) revert IBalanceWithdrawer.CallerNotBalanceClaimer();
         (bool success,) = _user.call{ value: _ethBalance }("");
         if (!success) {
-            revert EthTransferFailed();
+            revert IEthBalanceWithdrawer.EthTransferFailed();
         }
     }
 

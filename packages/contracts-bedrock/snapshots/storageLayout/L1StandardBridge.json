@@ -68,5 +68,12 @@
     "offset": 0,
     "slot": "51",
     "type": "contract ISystemConfig"
+  },
+  {
+    "bytes": "20",
+    "label": "balanceClaimer",
+    "offset": 0,
+    "slot": "52",
+    "type": "address"
   }
 ]

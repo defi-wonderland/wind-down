@@ -13,7 +13,12 @@ import { ISemver } from "src/universal/interfaces/ISemver.sol";
 
 /// @title BalanceClaimer
 /// @notice Contract that allows users to claim and withdraw their balances
-contract BalanceClaimer is Initializable, IBalanceClaimer, ISemver {
+contract BalanceClaimer is Initializable, ISemver {
+    /// @notice Emitted when a user claims their balance
+    event BalanceClaimed(
+        address indexed user, uint256 ethBalance, IBalanceWithdrawer.Erc20BalanceClaim[] erc20TokenBalances
+    );
+
     string public constant version = "1.0.0";
 
     /// @notice the root of the merkle tree
@@ -59,7 +64,7 @@ contract BalanceClaimer is Initializable, IBalanceClaimer, ISemver {
         external
     {
         if (!_canClaim(_proof, _user, _ethBalance, _erc20TokenBalances)) {
-            revert NoBalanceToClaim();
+            revert IBalanceClaimer.NoBalanceToClaim();
         }
         claimed[_user] = true;
         if (_erc20TokenBalances.length != 0) {

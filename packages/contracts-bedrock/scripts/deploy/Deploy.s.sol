@@ -905,7 +905,7 @@ contract Deploy is Deployer {
             _save: this,
             _salt: _implSalt(),
             _name: "BalanceClaimer",
-            _args: DeployUtils.encodeConstructor(abi.encodeWithSignature("__constructor__", abi.encode()))
+            _args: DeployUtils.encodeConstructor(abi.encodeCall(IBalanceClaimer.__constructor__, ()))
         });
 
         Types.ContractSet memory contracts = _proxiesUnstrict();
