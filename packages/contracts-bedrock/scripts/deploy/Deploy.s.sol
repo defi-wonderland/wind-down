@@ -1382,7 +1382,6 @@ contract Deploy is Deployer {
             _data: abi.encodeCall(IBalanceClaimer.initialize, (optimismPortalProxy, l1StandardBridgeProxy, _merkleRoot))
         });
 
-        //IOptimismPortal2 portal = IOptimismPortal2(payable(optimismPortalProxy));
         IBalanceClaimer _balanceClaimer = IBalanceClaimer(payable(balanceClaimerProxy));
         string memory version = ISemver(address(_balanceClaimer)).version();
         console.log("BalanceClaimer version: %s", version);

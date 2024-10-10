@@ -580,6 +580,7 @@ contract DeployOPChain is Script {
 
         vm.broadcast(msg.sender);
         OPContractsManager.DeployOutput memory deployOutput = opcmProxy.deploy(deployInput);
+
         vm.label(address(deployOutput.opChainProxyAdmin), "opChainProxyAdmin");
         vm.label(address(deployOutput.addressManager), "addressManager");
         vm.label(address(deployOutput.l1ERC721BridgeProxy), "l1ERC721BridgeProxy");
@@ -596,6 +597,7 @@ contract DeployOPChain is Script {
         vm.label(address(deployOutput.delayedWETHPermissionedGameProxy), "delayedWETHPermissionedGameProxy");
         // TODO: Eventually switch from Permissioned to Permissionless.
         // vm.label(address(deployOutput.delayedWETHPermissionlessGameProxy), "delayedWETHPermissionlessGameProxy");
+
         _doo.set(_doo.opChainProxyAdmin.selector, address(deployOutput.opChainProxyAdmin));
         _doo.set(_doo.addressManager.selector, address(deployOutput.addressManager));
         _doo.set(_doo.l1ERC721BridgeProxy.selector, address(deployOutput.l1ERC721BridgeProxy));
@@ -617,6 +619,7 @@ contract DeployOPChain is Script {
         //     _doo.delayedWETHPermissionlessGameProxy.selector,
         // address(deployOutput.delayedWETHPermissionlessGameProxy)
         // );
+
         _doo.checkOutput(_doi);
     }
 
