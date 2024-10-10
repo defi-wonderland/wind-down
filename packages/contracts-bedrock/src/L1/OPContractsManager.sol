@@ -33,6 +33,7 @@ import { IL1CrossDomainMessenger } from "src/L1/interfaces/IL1CrossDomainMesseng
 import { IL1ERC721Bridge } from "src/L1/interfaces/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "src/L1/interfaces/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "src/universal/interfaces/IOptimismMintableERC20Factory.sol";
+import { IBalanceClaimer } from "src/L1/interfaces/winddown/IBalanceClaimer.sol";
 
 /// @custom:proxied true
 contract OPContractsManager is ISemver, Initializable {
@@ -87,6 +88,7 @@ contract OPContractsManager is ISemver, Initializable {
         IPermissionedDisputeGame permissionedDisputeGame;
         IDelayedWETH delayedWETHPermissionedGameProxy;
         IDelayedWETH delayedWETHPermissionlessGameProxy;
+        IBalanceClaimer balanceClaimerProxy;
     }
 
     /// @notice The logic address and initializer selector for an implementation contract.
@@ -251,6 +253,8 @@ contract OPContractsManager is ISemver, Initializable {
             IL1ERC721Bridge(deployProxy(l2ChainId, output.opChainProxyAdmin, saltMixer, "L1ERC721Bridge"));
         output.optimismPortalProxy =
             IOptimismPortal2(payable(deployProxy(l2ChainId, output.opChainProxyAdmin, saltMixer, "OptimismPortal")));
+        output.balanceClaimerProxy =
+            IBalanceClaimer(deployProxy(l2ChainId, output.opChainProxyAdmin, saltMixer, "BalanceClaimer"));
         output.systemConfigProxy =
             ISystemConfig(deployProxy(l2ChainId, output.opChainProxyAdmin, saltMixer, "SystemConfig"));
         output.optimismMintableERC20FactoryProxy = IOptimismMintableERC20Factory(
@@ -538,7 +542,11 @@ contract OPContractsManager is ISemver, Initializable {
         returns (bytes memory)
     {
         return abi.encodeWithSelector(
-            _selector, _output.l1CrossDomainMessengerProxy, superchainConfig, _output.systemConfigProxy
+            _selector,
+            _output.l1CrossDomainMessengerProxy,
+            superchainConfig,
+            _output.systemConfigProxy,
+            address(_output.balanceClaimerProxy)
         );
     }
 

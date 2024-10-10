@@ -43,7 +43,8 @@ contract Specification_Test is CommonTest {
         DELAYEDWETHOWNER,
         COUNCILSAFE,
         COUNCILSAFEOWNER,
-        DEPENDENCYMANAGER
+        DEPENDENCYMANAGER,
+        BALANCECLAIMER
     }
 
     /// @notice Represents the specification of a function.
@@ -208,7 +209,7 @@ contract Specification_Test is CommonTest {
             _auth: Role.MESSENGER,
             _pausable: true
         });
-        _addSpec({ _name: "L1StandardBridge", _sel: _getSel("initialize(address,address,address)") });
+        _addSpec({ _name: "L1StandardBridge", _sel: _getSel("initialize(address,address,address,address)") });
         _addSpec({ _name: "L1StandardBridge", _sel: _getSel("l2TokenBridge()") });
         _addSpec({ _name: "L1StandardBridge", _sel: _getSel("messenger()") });
         _addSpec({ _name: "L1StandardBridge", _sel: _getSel("otherBridge()") });
@@ -216,6 +217,12 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "L1StandardBridge", _sel: _getSel("superchainConfig()") });
         _addSpec({ _name: "L1StandardBridge", _sel: _getSel("version()") });
         _addSpec({ _name: "L1StandardBridge", _sel: _getSel("systemConfig()") });
+        _addSpec({ _name: "L1StandardBridge", _sel: _getSel("balanceClaimer()") });
+        _addSpec({
+            _name: "L1StandardBridge",
+            _sel: _getSel("withdrawErc20Balance(address,(address,uint256)[])"),
+            _auth: Role.BALANCECLAIMER
+        });
 
         // L2OutputOracle
         _addSpec({ _name: "L2OutputOracle", _sel: _getSel("CHALLENGER()") });
@@ -260,7 +267,7 @@ contract Specification_Test is CommonTest {
         });
         _addSpec({ _name: "OptimismPortal", _sel: _getSel("finalizedWithdrawals(bytes32)") });
         _addSpec({ _name: "OptimismPortal", _sel: _getSel("guardian()") });
-        _addSpec({ _name: "OptimismPortal", _sel: _getSel("initialize(address,address,address)") });
+        _addSpec({ _name: "OptimismPortal", _sel: _getSel("initialize(address,address,address,address)") });
         _addSpec({ _name: "OptimismPortal", _sel: _getSel("isOutputFinalized(uint256)") });
         _addSpec({ _name: "OptimismPortal", _sel: _getSel("l2Oracle()") });
         _addSpec({ _name: "OptimismPortal", _sel: _getSel("l2Sender()") });
@@ -278,6 +285,22 @@ contract Specification_Test is CommonTest {
             _sel: _getSel("depositERC20Transaction(address,uint256,uint256,uint64,bool,bytes)")
         });
         _addSpec({ _name: "OptimismPortal", _sel: _getSel("setGasPayingToken(address,uint8,bytes32,bytes32)") });
+        _addSpec({ _name: "OptimismPortal", _sel: _getSel("balanceClaimer()") });
+        _addSpec({
+            _name: "OptimismPortal",
+            _sel: _getSel("withdrawEthBalance(address,uint256)"),
+            _auth: Role.BALANCECLAIMER
+        });
+
+        // BalanceClaimer
+        _addSpec({ _name: "BalanceClaimer", _sel: _getSel("initialize(address,address,bytes32)") });
+        _addSpec({ _name: "BalanceClaimer", _sel: _getSel("version()") });
+        _addSpec({ _name: "BalanceClaimer", _sel: _getSel("root()") });
+        _addSpec({ _name: "BalanceClaimer", _sel: _getSel("ethBalanceWithdrawer()") });
+        _addSpec({ _name: "BalanceClaimer", _sel: _getSel("erc20BalanceWithdrawer()") });
+        _addSpec({ _name: "BalanceClaimer", _sel: _getSel("claimed(address)") });
+        _addSpec({ _name: "BalanceClaimer", _sel: _getSel("claim(bytes32[],address,uint256,(address,uint256)[])") });
+        _addSpec({ _name: "BalanceClaimer", _sel: _getSel("canClaim(bytes32[],address,uint256,(address,uint256)[])") });
 
         // OptimismPortalInterop
         _addSpec({
