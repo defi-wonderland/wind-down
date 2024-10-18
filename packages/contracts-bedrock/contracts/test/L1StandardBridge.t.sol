@@ -16,12 +16,13 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { stdStorage, StdStorage } from "forge-std/Test.sol";
 
 contract L1StandardBridge_Getter_Test is Bridge_Initializer {
-    function git() external {
+    function test_getters_succeeds() external {
         assert(L1Bridge.l2TokenBridge() == address(L2Bridge));
         assert(L1Bridge.OTHER_BRIDGE() == L2Bridge);
         assert(L1Bridge.messenger() == L1Messenger);
         assert(L1Bridge.MESSENGER() == L1Messenger);
         assertEq(L1Bridge.version(), "1.1.0");
+        assertEq(address(L1Bridge.balanceClaimer()), address(balanceClaimerProxy));
     }
 }
 
