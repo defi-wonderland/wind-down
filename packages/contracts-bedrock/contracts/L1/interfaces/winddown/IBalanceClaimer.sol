@@ -7,8 +7,6 @@ import { IErc20BalanceWithdrawer } from "./IErc20BalanceWithdrawer.sol";
 /// @title IBalanceClaimer
 /// @notice Interface for the BalanceClaimer contract
 interface IBalanceClaimer {
-    event Initialized(uint8 version);
-
     /// @notice Emitted when a user claims their balance
     event BalanceClaimed(
         address indexed user,
@@ -19,8 +17,6 @@ interface IBalanceClaimer {
     /// @notice Thrown when the user has no balance to claim
     error NoBalanceToClaim();
 
-    function version() external view returns (string memory);
-
     function root() external view returns (bytes32);
 
     function ethBalanceWithdrawer() external view returns (IEthBalanceWithdrawer);
@@ -28,8 +24,6 @@ interface IBalanceClaimer {
     function erc20BalanceWithdrawer() external view returns (IErc20BalanceWithdrawer);
 
     function claimed(address) external view returns (bool);
-
-    function __constructor__() external;
 
     function initialize(
         address _ethBalanceWithdrawer,

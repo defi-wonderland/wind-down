@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+// Interfaces
+import { IEthBalanceWithdrawer } from "../L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
+
 import { stdError } from "forge-std/Test.sol";
 import { Portal_Initializer, CommonTest, NextImpl } from "./CommonTest.t.sol";
 import { AddressAliasHelper } from "../vendor/AddressAliasHelper.sol";
@@ -1235,5 +1238,46 @@ contract OptimismPortalResourceFuzz_Test is Portal_Initializer {
             _isCreation: false,
             _data: hex""
         });
+    }
+}
+
+contract OptimismPortal_WithdrawEthBalance_Test is Portal_Initializer {
+    /// @dev Check if an address is a contract
+    function _isContract(address _addr) internal view returns (bool) {
+        uint256 _size;
+        assembly {
+            _size := extcodesize(_addr)
+        }
+        return _size > 0;
+    }
+
+    /// @dev Tests that `withdrawEthBalance` succeeds when the balance claimer is the caller.
+    function testFuzz_withdrawEthBalance_succeeds(address _user, uint256 _balance) external {
+        vm.assume(!_isContract(_user));
+        vm.deal(address(op), _balance);
+
+        vm.prank(address(op.balanceClaimer()));
+        op.withdrawEthBalance(_user, _balance);
+
+        assertEq(address(op).balance, 0);
+        assertEq(address(_user).balance, _balance);
+    }
+
+    /// @dev Tests that `withdrawEthBalance` reverts when the balance claimer is not the caller.
+    function testFuzz_withdrawEthBalance_reverts(
+        address _user,
+        address _notBalanceClaimer,
+        uint256 _balance
+    )
+        external
+    {
+        vm.assume(_notBalanceClaimer != address(op.balanceClaimer()));
+        vm.assume(!_isContract(_user));
+        vm.deal(address(op), _balance);
+
+        vm.expectRevert(IEthBalanceWithdrawer.CallerNotBalanceClaimer.selector);
+
+        vm.prank(_notBalanceClaimer);
+        op.withdrawEthBalance(_user, _balance);
     }
 }

@@ -165,13 +165,8 @@ contract BalanceClaimer_Initializer is L2OutputOracle_Initializer {
     function setUp() public virtual override {
         super.setUp();
         Proxy proxy = new Proxy(multisig);
-        balanceClaimerProxy = IBalanceClaimer(address(proxy));
         // The Balance Claimer is initialized with the Merkle root and when L1StandardBridge and OptimismPortal are deployed
-        /*
-        vm.prank(multisig);
-        balanceClaimerImpl = new BalanceClaimer();
-        proxy.upgradeToAndCall(address(balanceClaimerImpl), abi.encodeWithSelector(BalanceClaimer.initialize.selector), address(0));
-        ;*/
+        balanceClaimerProxy = IBalanceClaimer(address(proxy));
         vm.label(address(balanceClaimerProxy), "BalanceClaimerProxy");
     }
 }

@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 // Interfaces
-import {IErc20BalanceWithdrawer} from "../L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IErc20BalanceWithdrawer } from "../L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { Bridge_Initializer } from "./CommonTest.t.sol";
 import { StandardBridge } from "../universal/StandardBridge.sol";

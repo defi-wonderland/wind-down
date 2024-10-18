@@ -12,13 +12,8 @@ import { IBalanceClaimer } from "../interfaces/winddown/IBalanceClaimer.sol";
 import { Semver } from "../../universal/Semver.sol";
 
 /// @title BalanceClaimer
-/// @notice Contract that allows users to claim and withdraw their balances
-contract BalanceClaimer is Initializable, Semver {
-    /// @notice Emitted when a user claims their balance
-    event BalanceClaimed(
-        address indexed user, uint256 ethBalance, IErc20BalanceWithdrawer.Erc20BalanceClaim[] erc20TokenBalances
-    );
-
+/// @notice Contract that allows users to claim and withdraw their eth and erc20 balances
+contract BalanceClaimer is Initializable, Semver, IBalanceClaimer {
     /// @notice the root of the merkle tree
     bytes32 public root;
 
@@ -56,7 +51,7 @@ contract BalanceClaimer is Initializable, Semver {
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20TokenBalances
     ) external {
         if (!_canClaim(_proof, _user, _ethBalance, _erc20TokenBalances)) {
-            revert IBalanceClaimer.NoBalanceToClaim();
+            revert NoBalanceToClaim();
         }
         claimed[_user] = true;
         if (_erc20TokenBalances.length != 0) {
