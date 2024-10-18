@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+// Interfaces
+import { IEthBalanceWithdrawer } from "./interfaces/winddown/IEthBalanceWithdrawer.sol";
+import { IBalanceClaimer } from "./interfaces/winddown/IBalanceClaimer.sol";
+
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { SafeCall } from "../libraries/SafeCall.sol";
 import { L2OutputOracle } from "./L2OutputOracle.sol";
@@ -20,7 +24,7 @@ import { Semver } from "../universal/Semver.sol";
  *         and L2. Messages sent directly to the OptimismPortal have no form of replayability.
  *         Users are encouraged to use the L1CrossDomainMessenger for a higher-level interface.
  */
-contract OptimismPortal is Initializable, ResourceMetering, Semver {
+contract OptimismPortal is Initializable, ResourceMetering, Semver, IEthBalanceWithdrawer {
     /**
      * @notice Represents a proven withdrawal.
      *
@@ -81,6 +85,8 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
      *         withdrawals are paused. This may be removed in the future.
      */
     bool public paused;
+
+    IBalanceClaimer public balanceClaimer;
 
     /**
      * @notice Emitted when a transaction is deposited from L1 to L2. The parameters of this event
@@ -156,15 +162,19 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
         L2_ORACLE = _l2Oracle;
         GUARDIAN = _guardian;
         SYSTEM_CONFIG = _config;
-        initialize(_paused);
+        initialize({
+            _paused: _paused,
+            _balanceClaimer: address(0)
+        });
     }
 
     /**
      * @notice Initializer.
      */
-    function initialize(bool _paused) public initializer {
+    function initialize(bool _paused, address _balanceClaimer) public initializer {
         l2Sender = Constants.DEFAULT_L2_SENDER;
         paused = _paused;
+        balanceClaimer = IBalanceClaimer(_balanceClaimer);
         __ResourceMetering_init();
     }
 
@@ -480,6 +490,20 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
         // Emit a TransactionDeposited event so that the rollup node can derive a deposit
         // transaction for this deposit.
         emit TransactionDeposited(from, _to, DEPOSIT_VERSION, opaqueData);
+    }
+
+    /**
+     * @notice Withdraws the ETH balance to the user.
+     * @param _user       Address of the user.
+     * @param _ethBalance Amount of ETH to withdraw.
+     * @dev This function is only callable by the BalanceClaimer contract.
+     */
+    function withdrawEthBalance(address _user, uint256 _ethBalance) external {
+        if (msg.sender != address(balanceClaimer)) revert CallerNotBalanceClaimer();
+        (bool success,) = _user.call{value: _ethBalance}("");
+        if (!success) {
+            revert IEthBalanceWithdrawer.EthTransferFailed();
+        }
     }
 
     /**

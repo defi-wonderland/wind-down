@@ -31,6 +31,7 @@ import { LegacyMintableERC20 } from "../legacy/LegacyMintableERC20.sol";
 import { SystemConfig } from "../L1/SystemConfig.sol";
 import { ResourceMetering } from "../L1/ResourceMetering.sol";
 import { Constants } from "../libraries/Constants.sol";
+import { IBalanceClaimer, BalanceClaimer } from "../L1/winddown/BalanceClaimer.sol";
 
 contract CommonTest is Test {
     address alice = address(128);
@@ -157,7 +158,25 @@ contract L2OutputOracle_Initializer is CommonTest {
     }
 }
 
-contract Portal_Initializer is L2OutputOracle_Initializer {
+contract BalanceClaimer_Initializer is L2OutputOracle_Initializer {
+    IBalanceClaimer balanceClaimerProxy;
+    BalanceClaimer balanceClaimerImpl;
+
+    function setUp() public virtual override {
+        super.setUp();
+        Proxy proxy = new Proxy(multisig);
+        balanceClaimerProxy = IBalanceClaimer(address(proxy));
+        // The Balance Claimer is initialized with the Merkle root and when L1StandardBridge and OptimismPortal are deployed
+        /*
+        vm.prank(multisig);
+        balanceClaimerImpl = new BalanceClaimer();
+        proxy.upgradeToAndCall(address(balanceClaimerImpl), abi.encodeWithSelector(BalanceClaimer.initialize.selector), address(0));
+        ;*/
+        vm.label(address(balanceClaimerProxy), "BalanceClaimerProxy");
+    }
+}
+
+contract Portal_Initializer is BalanceClaimer_Initializer {
     // Test target
     OptimismPortal internal opImpl;
     OptimismPortal internal op;
@@ -196,7 +215,7 @@ contract Portal_Initializer is L2OutputOracle_Initializer {
         vm.prank(multisig);
         proxy.upgradeToAndCall(
             address(opImpl),
-            abi.encodeWithSelector(OptimismPortal.initialize.selector, false)
+            abi.encodeWithSelector(OptimismPortal.initialize.selector, false, address(balanceClaimerProxy))
         );
         op = OptimismPortal(payable(address(proxy)));
         vm.label(address(op), "OptimismPortal");
@@ -392,9 +411,12 @@ contract Bridge_Initializer is Messenger_Initializer {
         proxy.setCode(address(new L1StandardBridge(payable(address(L1Messenger)))).code);
         vm.clearMockedCalls();
         address L1Bridge_Impl = proxy.getImplementation();
-        vm.stopPrank();
 
         L1Bridge = L1StandardBridge(payable(address(proxy)));
+
+        // Initialize L1StandardBridge
+        L1Bridge.initialize(address(balanceClaimerProxy));
+        vm.stopPrank();
 
         vm.label(address(proxy), "L1StandardBridge_Proxy");
         vm.label(address(L1Bridge_Impl), "L1StandardBridge_Impl");

@@ -21,6 +21,11 @@ contract OptimismPortal_Test is Portal_Initializer {
         assertEq(op.paused(), false);
     }
 
+    function test_initialize_succeeds() external {
+        assertEq(address(op.balanceClaimer()), address(balanceClaimerProxy));
+        assertEq(op.paused(), false);
+    }
+
     /**
      * @notice The OptimismPortal can be paused by the GUARDIAN
      */
@@ -1120,12 +1125,12 @@ contract OptimismPortalUpgradeable_Test is Portal_Initializer {
 
     function test_initialize_cannotInitProxy_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
-        OptimismPortal(payable(proxy)).initialize(false);
+        OptimismPortal(payable(proxy)).initialize(false, address(0));
     }
 
     function test_initialize_cannotInitImpl_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
-        OptimismPortal(opImpl).initialize(false);
+        OptimismPortal(opImpl).initialize(false, address(0));
     }
 
     function test_upgradeToAndCall_upgrading_succeeds() external {
