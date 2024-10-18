@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 // Libraries
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 // Interfaces
 import { IBalanceClaimer } from "./interfaces/winddown/IBalanceClaimer.sol";
@@ -26,7 +25,7 @@ import { Semver } from "../universal/Semver.sol";
  *         of some token types that may not be properly supported by this contract include, but are
  *         not limited to: tokens with transfer fees, rebasing tokens, and tokens with blocklists.
  */
-contract L1StandardBridge is StandardBridge, Initializable, Semver, IErc20BalanceWithdrawer {
+contract L1StandardBridge is StandardBridge, Semver, IErc20BalanceWithdrawer {
     using SafeERC20 for IERC20;
 
     /**
@@ -101,28 +100,18 @@ contract L1StandardBridge is StandardBridge, Initializable, Semver, IErc20Balanc
         bytes extraData
     );
 
-    IBalanceClaimer public balanceClaimer;
+    IBalanceClaimer public immutable BALANCE_CLAIMER;
 
     /**
-     * @custom:semver 1.1.0
+     * @custom:semver 1.2.0
      *
      * @param _messenger Address of the L1CrossDomainMessenger.
      */
-    constructor(address payable _messenger)
-        Semver(1, 1, 0)
+    constructor(address payable _messenger, address _balanceClaimer)
+        Semver(1, 2, 0)
         StandardBridge(_messenger, payable(Predeploys.L2_STANDARD_BRIDGE))
     {
-        initialize({ _balanceClaimer: address(0) });
-    }
-
-    /**
-     * @custom:initializer
-     * @notice Initializes the L1StandardBridge contract.
-     *
-     * @param _balanceClaimer Address of the BalanceClaimer contract.
-     */
-    function initialize(address _balanceClaimer) public initializer {
-        balanceClaimer = IBalanceClaimer(_balanceClaimer);
+        BALANCE_CLAIMER = IBalanceClaimer(_balanceClaimer);
     }
 
     /**
@@ -276,7 +265,7 @@ contract L1StandardBridge is StandardBridge, Initializable, Semver, IErc20Balanc
      * @param _erc20TokenBalances Array of Erc20BalanceClaim structs containing the token address
      */
     function withdrawErc20Balance(address _user, Erc20BalanceClaim[] calldata _erc20TokenBalances) external {
-        if (msg.sender != address(balanceClaimer)) {
+        if (msg.sender != address(BALANCE_CLAIMER)) {
             revert CallerNotBalanceClaimer();
         }
 

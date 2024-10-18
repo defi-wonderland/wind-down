@@ -203,14 +203,15 @@ contract Portal_Initializer is BalanceClaimer_Initializer {
             _l2Oracle: oracle,
             _guardian: guardian,
             _paused: true,
-            _config: systemConfig
+            _config: systemConfig,
+            _balanceClaimer: address(balanceClaimerProxy)
         });
 
         Proxy proxy = new Proxy(multisig);
         vm.prank(multisig);
         proxy.upgradeToAndCall(
             address(opImpl),
-            abi.encodeWithSelector(OptimismPortal.initialize.selector, false, address(balanceClaimerProxy))
+            abi.encodeWithSelector(OptimismPortal.initialize.selector, false)
         );
         op = OptimismPortal(payable(address(proxy)));
         vm.label(address(op), "OptimismPortal");
@@ -403,15 +404,13 @@ contract Bridge_Initializer is Messenger_Initializer {
             abi.encode(true)
         );
         vm.startPrank(multisig);
-        proxy.setCode(address(new L1StandardBridge(payable(address(L1Messenger)))).code);
+        address impl = address(new L1StandardBridge(payable(address(L1Messenger)), address(balanceClaimerProxy)));
+        proxy.setCode(impl.code);
         vm.clearMockedCalls();
         address L1Bridge_Impl = proxy.getImplementation();
+        vm.stopPrank();
 
         L1Bridge = L1StandardBridge(payable(address(proxy)));
-
-        // Initialize L1StandardBridge
-        L1Bridge.initialize(address(balanceClaimerProxy));
-        vm.stopPrank();
 
         vm.label(address(proxy), "L1StandardBridge_Proxy");
         vm.label(address(L1Bridge_Impl), "L1StandardBridge_Impl");

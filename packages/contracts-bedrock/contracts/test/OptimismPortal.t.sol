@@ -14,6 +14,9 @@ import { Hashing } from "../libraries/Hashing.sol";
 import { Proxy } from "../universal/Proxy.sol";
 import { ResourceMetering } from "../L1/ResourceMetering.sol";
 
+import { Proxy } from "../universal/Proxy.sol";
+
+
 contract OptimismPortal_Test is Portal_Initializer {
     event Paused(address);
     event Unpaused(address);
@@ -25,7 +28,7 @@ contract OptimismPortal_Test is Portal_Initializer {
     }
 
     function test_initialize_succeeds() external {
-        assertEq(address(op.balanceClaimer()), address(balanceClaimerProxy));
+        assertEq(address(op.BALANCE_CLAIMER()), address(balanceClaimerProxy));
         assertEq(op.paused(), false);
     }
 
@@ -1128,12 +1131,12 @@ contract OptimismPortalUpgradeable_Test is Portal_Initializer {
 
     function test_initialize_cannotInitProxy_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
-        OptimismPortal(payable(proxy)).initialize(false, address(0));
+        OptimismPortal(payable(proxy)).initialize(false);
     }
 
     function test_initialize_cannotInitImpl_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
-        OptimismPortal(opImpl).initialize(false, address(0));
+        OptimismPortal(opImpl).initialize(false);
     }
 
     function test_upgradeToAndCall_upgrading_succeeds() external {
@@ -1256,7 +1259,7 @@ contract OptimismPortal_WithdrawEthBalance_Test is Portal_Initializer {
         vm.assume(!_isContract(_user));
         vm.deal(address(op), _balance);
 
-        vm.prank(address(op.balanceClaimer()));
+        vm.prank(address(op.BALANCE_CLAIMER()));
         op.withdrawEthBalance(_user, _balance);
 
         assertEq(address(op).balance, 0);
@@ -1271,7 +1274,7 @@ contract OptimismPortal_WithdrawEthBalance_Test is Portal_Initializer {
     )
         external
     {
-        vm.assume(_notBalanceClaimer != address(op.balanceClaimer()));
+        vm.assume(_notBalanceClaimer != address(op.BALANCE_CLAIMER()));
         vm.assume(!_isContract(_user));
         vm.deal(address(op), _balance);
 

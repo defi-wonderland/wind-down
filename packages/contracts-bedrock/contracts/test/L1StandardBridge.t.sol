@@ -22,7 +22,7 @@ contract L1StandardBridge_Getter_Test is Bridge_Initializer {
         assert(L1Bridge.messenger() == L1Messenger);
         assert(L1Bridge.MESSENGER() == L1Messenger);
         assertEq(L1Bridge.version(), "1.1.0");
-        assertEq(address(L1Bridge.balanceClaimer()), address(balanceClaimerProxy));
+        assertEq(address(L1Bridge.BALANCE_CLAIMER()), address(balanceClaimerProxy));
     }
 }
 
@@ -34,7 +34,7 @@ contract L1StandardBridge_Initialize_Test is Bridge_Initializer {
 
         assertEq(address(L2Bridge), Predeploys.L2_STANDARD_BRIDGE);
 
-        assertEq(address(L1Bridge.balanceClaimer()), address(balanceClaimerProxy));
+        assertEq(address(L1Bridge.BALANCE_CLAIMER()), address(balanceClaimerProxy));
     }
 }
 
@@ -780,7 +780,7 @@ contract L1StandardBridge_WithdrawErc20Balance_Test is Bridge_Initializer {
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _balances =
             _mockTokensExpectCallsAndGetBalancesArray(_user, true, _fuzzBalances);
 
-        vm.prank(address(L1Bridge.balanceClaimer()));
+        vm.prank(address(L1Bridge.BALANCE_CLAIMER()));
         IErc20BalanceWithdrawer(address(L1Bridge)).withdrawErc20Balance(_user, _balances);
     }
 
@@ -793,7 +793,7 @@ contract L1StandardBridge_WithdrawErc20Balance_Test is Bridge_Initializer {
         external
     {
         // calling from unauthorized address
-        vm.assume(_notBalanceClaimer != address(L1Bridge.balanceClaimer()));
+        vm.assume(_notBalanceClaimer != address(L1Bridge.BALANCE_CLAIMER()));
 
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _balances =
             _mockTokensExpectCallsAndGetBalancesArray(_user, false, _fuzzBalances);

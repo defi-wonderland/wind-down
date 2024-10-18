@@ -14,5 +14,5 @@ interface IEthBalanceWithdrawer {
 
     function withdrawEthBalance(address _user, uint256 _ethBalance) external;
 
-    function balanceClaimer() external view returns (IBalanceClaimer);
+    function BALANCE_CLAIMER() external view returns (IBalanceClaimer);
 }

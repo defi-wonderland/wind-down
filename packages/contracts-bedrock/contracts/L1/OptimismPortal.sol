@@ -86,7 +86,7 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver, IEthBalanceW
      */
     bool public paused;
 
-    IBalanceClaimer public balanceClaimer;
+    IBalanceClaimer public immutable BALANCE_CLAIMER;
 
     /**
      * @notice Emitted when a transaction is deposited from L1 to L2. The parameters of this event
@@ -146,35 +146,34 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver, IEthBalanceW
     }
 
     /**
-     * @custom:semver 1.6.0
+     * @custom:semver 1.7.0
      *
      * @param _l2Oracle                  Address of the L2OutputOracle contract.
      * @param _guardian                  Address that can pause deposits and withdrawals.
      * @param _paused                    Sets the contract's pausability state.
      * @param _config                    Address of the SystemConfig contract.
+     * @param _balanceClaimer            Address of the BalanceClaimer contract.
      */
     constructor(
         L2OutputOracle _l2Oracle,
         address _guardian,
         bool _paused,
-        SystemConfig _config
-    ) Semver(1, 6, 0) {
+        SystemConfig _config,
+        address _balanceClaimer
+    ) Semver(1, 7, 0) {
         L2_ORACLE = _l2Oracle;
         GUARDIAN = _guardian;
         SYSTEM_CONFIG = _config;
-        initialize({
-            _paused: _paused,
-            _balanceClaimer: address(0)
-        });
+        BALANCE_CLAIMER = IBalanceClaimer(_balanceClaimer);
+        initialize(_paused);
     }
 
     /**
      * @notice Initializer.
      */
-    function initialize(bool _paused, address _balanceClaimer) public initializer {
+    function initialize(bool _paused) public initializer {
         l2Sender = Constants.DEFAULT_L2_SENDER;
         paused = _paused;
-        balanceClaimer = IBalanceClaimer(_balanceClaimer);
         __ResourceMetering_init();
     }
 
@@ -499,7 +498,7 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver, IEthBalanceW
      * @dev This function is only callable by the BalanceClaimer contract.
      */
     function withdrawEthBalance(address _user, uint256 _ethBalance) external {
-        if (msg.sender != address(balanceClaimer)) revert CallerNotBalanceClaimer();
+        if (msg.sender != address(BALANCE_CLAIMER)) revert CallerNotBalanceClaimer();
         (bool success,) = _user.call{value: _ethBalance}("");
         if (!success) {
             revert IEthBalanceWithdrawer.EthTransferFailed();

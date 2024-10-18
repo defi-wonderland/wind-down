@@ -18,5 +18,5 @@ interface IErc20BalanceWithdrawer {
     function withdrawErc20Balance(address _user, Erc20BalanceClaim[] calldata _erc20TokenBalances)
         external;
 
-    function balanceClaimer() external view returns (IBalanceClaimer);
+    function BALANCE_CLAIMER() external view returns (IBalanceClaimer);
 }
