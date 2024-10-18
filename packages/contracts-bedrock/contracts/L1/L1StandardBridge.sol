@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+// Libraries
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+// Interfaces
+import { IBalanceClaimer } from "./interfaces/winddown/IBalanceClaimer.sol";
+import { IErc20BalanceWithdrawer } from "./interfaces/winddown/IErc20BalanceWithdrawer.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import { Predeploys } from "../libraries/Predeploys.sol";
 import { StandardBridge } from "../universal/StandardBridge.sol";
 import { Semver } from "../universal/Semver.sol";
@@ -17,7 +25,9 @@ import { Semver } from "../universal/Semver.sol";
  *         of some token types that may not be properly supported by this contract include, but are
  *         not limited to: tokens with transfer fees, rebasing tokens, and tokens with blocklists.
  */
-contract L1StandardBridge is StandardBridge, Semver {
+contract L1StandardBridge is StandardBridge, Semver, IErc20BalanceWithdrawer {
+    using SafeERC20 for IERC20;
+
     /**
      * @custom:legacy
      * @notice Emitted whenever a deposit of ETH from L1 into L2 is initiated.
@@ -91,14 +101,22 @@ contract L1StandardBridge is StandardBridge, Semver {
     );
 
     /**
-     * @custom:semver 1.1.0
+     * @notice Address of the balance claimer contract.
+     * @dev This contract is responsible for claiming the ERC20 balances of the bridge.
+     */
+    IBalanceClaimer public immutable BALANCE_CLAIMER;
+
+    /**
+     * @custom:semver 1.2.0
      *
      * @param _messenger Address of the L1CrossDomainMessenger.
      */
-    constructor(address payable _messenger)
-        Semver(1, 1, 0)
+    constructor(address payable _messenger, address _balanceClaimer)
+        Semver(1, 2, 0)
         StandardBridge(_messenger, payable(Predeploys.L2_STANDARD_BRIDGE))
-    {}
+    {
+        BALANCE_CLAIMER = IBalanceClaimer(_balanceClaimer);
+    }
 
     /**
      * @notice Allows EOAs to bridge ETH by sending directly to the bridge.
@@ -242,6 +260,22 @@ contract L1StandardBridge is StandardBridge, Semver {
         bytes calldata _extraData
     ) external {
         finalizeBridgeERC20(_l1Token, _l2Token, _from, _to, _amount, _extraData);
+    }
+
+    /**
+     * @inheritdoc IErc20BalanceWithdrawer
+     * @notice Withdraws the ERC20 balance to the user.
+     * @param _user Address of the user.
+     * @param _erc20Claim Array of Erc20BalanceClaim structs containing the token address
+     */
+    function withdrawErc20Balance(address _user, Erc20BalanceClaim[] calldata _erc20Claim) external {
+        if (msg.sender != address(BALANCE_CLAIMER)) {
+            revert CallerNotBalanceClaimer();
+        }
+
+        for (uint256 _i; _i < _erc20Claim.length; _i++) {
+            IERC20(_erc20Claim[_i].token).safeTransfer(_user, _erc20Claim[_i].balance);
+        }
     }
 
     /**

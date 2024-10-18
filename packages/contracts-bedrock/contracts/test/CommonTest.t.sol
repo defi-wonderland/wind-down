@@ -31,6 +31,7 @@ import { LegacyMintableERC20 } from "../legacy/LegacyMintableERC20.sol";
 import { SystemConfig } from "../L1/SystemConfig.sol";
 import { ResourceMetering } from "../L1/ResourceMetering.sol";
 import { Constants } from "../libraries/Constants.sol";
+import { IBalanceClaimer, BalanceClaimer } from "../L1/winddown/BalanceClaimer.sol";
 
 contract CommonTest is Test {
     address alice = address(128);
@@ -157,7 +158,20 @@ contract L2OutputOracle_Initializer is CommonTest {
     }
 }
 
-contract Portal_Initializer is L2OutputOracle_Initializer {
+contract BalanceClaimer_Initializer is L2OutputOracle_Initializer {
+    IBalanceClaimer balanceClaimerProxy;
+    BalanceClaimer balanceClaimerImpl;
+
+    function setUp() public virtual override {
+        super.setUp();
+        Proxy proxy = new Proxy(multisig);
+        // The Balance Claimer is initialized with the Merkle root and when L1StandardBridge and OptimismPortal are deployed
+        balanceClaimerProxy = IBalanceClaimer(address(proxy));
+        vm.label(address(balanceClaimerProxy), "BalanceClaimerProxy");
+    }
+}
+
+contract Portal_Initializer is BalanceClaimer_Initializer {
     // Test target
     OptimismPortal internal opImpl;
     OptimismPortal internal op;
@@ -189,7 +203,8 @@ contract Portal_Initializer is L2OutputOracle_Initializer {
             _l2Oracle: oracle,
             _guardian: guardian,
             _paused: true,
-            _config: systemConfig
+            _config: systemConfig,
+            _balanceClaimer: address(balanceClaimerProxy)
         });
 
         Proxy proxy = new Proxy(multisig);
@@ -389,7 +404,8 @@ contract Bridge_Initializer is Messenger_Initializer {
             abi.encode(true)
         );
         vm.startPrank(multisig);
-        proxy.setCode(address(new L1StandardBridge(payable(address(L1Messenger)))).code);
+        address impl = address(new L1StandardBridge(payable(address(L1Messenger)), address(balanceClaimerProxy)));
+        proxy.setCode(impl.code);
         vm.clearMockedCalls();
         address L1Bridge_Impl = proxy.getImplementation();
         vm.stopPrank();
