@@ -1267,7 +1267,7 @@ contract OptimismPortal_WithdrawEthBalance_Test is Portal_Initializer {
     }
 
     /// @dev Tests that `withdrawEthBalance` reverts when the balance claimer is not the caller.
-    function testFuzz_withdrawEthBalance_reverts(
+    function testFuzz_withdrawEthBalance_reverts_notBalanceClaimer(
         address _user,
         address _notBalanceClaimer,
         uint256 _balance

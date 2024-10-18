@@ -4,10 +4,18 @@ pragma solidity ^0.8.15;
 import { IEthBalanceWithdrawer } from "./IEthBalanceWithdrawer.sol";
 import { IErc20BalanceWithdrawer } from "./IErc20BalanceWithdrawer.sol";
 
-/// @title IBalanceClaimer
-/// @notice Interface for the BalanceClaimer contract
+
+/**
+  * @title IBalanceClaimer
+  * @notice Interface for the BalanceClaimer contract
+ */
 interface IBalanceClaimer {
-    /// @notice Emitted when a user claims their balance
+    /**
+     * @notice Emitted when a user claims their balance
+     * @param user The user who claimed their balance
+     * @param ethBalance The eth balance of the user
+     * @param erc20TokenBalances The ERC20 token balances of the user
+     */
     event BalanceClaimed(
         address indexed user,
         uint256 ethBalance,
@@ -35,13 +43,13 @@ interface IBalanceClaimer {
         bytes32[] calldata _proof,
         address _user,
         uint256 _ethBalance,
-        IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20TokenBalances
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20Claim
     ) external;
 
     function canClaim(
         bytes32[] calldata _proof,
         address _user,
         uint256 _ethBalance,
-        IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20TokenBalances
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20Claim
     ) external view returns (bool _canClaimTokens);
 }

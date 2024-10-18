@@ -85,7 +85,7 @@ contract BalanceClaimer_Test is BalanceClaimer_Initializer {
     )
         internal
         view
-        returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20TokenBalances)
+        returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20Claim)
     {
         uint8 _length;
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _auxErc20TokenBalances =
@@ -107,11 +107,11 @@ contract BalanceClaimer_Test is BalanceClaimer_Initializer {
                 IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: _token3, balance: _balanceToken3 });
         }
 
-        _erc20TokenBalances = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](_length);
+        _erc20Claim = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](_length);
         uint256 _index;
         for (uint256 _i = 0; _i < _auxErc20TokenBalances.length; _i++) {
             if (_auxErc20TokenBalances[_i].balance > 0) {
-                _erc20TokenBalances[_index] = _auxErc20TokenBalances[_i];
+                _erc20Claim[_index] = _auxErc20TokenBalances[_i];
                 _index++;
             }
         }
@@ -121,11 +121,11 @@ contract BalanceClaimer_Test is BalanceClaimer_Initializer {
     function _getLeaves(ClaimData[3] memory _claimData) internal view returns (bytes32[] memory _leaves) {
         _leaves = new bytes32[](_claimData.length);
         for (uint256 _i; _i < _claimData.length; _i++) {
-            IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20TokenBalances = _getErc20TokenBalances(
+            IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20Claim = _getErc20TokenBalances(
                 _claimData[_i].balanceToken1, _claimData[_i].balanceToken2, _claimData[_i].balanceToken3
             );
             _leaves[_i] = keccak256(
-                bytes.concat(keccak256(abi.encode(_users[_i], _claimData[_i].ethBalance, _erc20TokenBalances)))
+                bytes.concat(keccak256(abi.encode(_users[_i], _claimData[_i].ethBalance, _erc20Claim)))
             );
         }
     }
@@ -140,13 +140,13 @@ contract BalanceClaimer_Test is BalanceClaimer_Initializer {
     /// @dev Mock the erc20 balance withdraw call and set the expect call if at least one balance is greater than 0
     function _mockErc20BalanceWithdrawCallAndSetExpectCall(
         address _user,
-        IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20TokenBalances
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20Claim
     )
         internal
     {
         bool _called;
-        for (uint256 _i = 0; _i < _erc20TokenBalances.length; _i++) {
-            if (_erc20TokenBalances[_i].balance > 0) {
+        for (uint256 _i = 0; _i < _erc20Claim.length; _i++) {
+            if (_erc20Claim[_i].balance > 0) {
                 _called = true;
                 break;
             }
@@ -156,13 +156,13 @@ contract BalanceClaimer_Test is BalanceClaimer_Initializer {
         }
         vm.mockCall(
             address(balanceClaimerProxy.erc20BalanceWithdrawer()),
-            abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector, _user, _erc20TokenBalances),
+            abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector, _user, _erc20Claim),
             abi.encode(true)
         );
 
         vm.expectCall(
             address(balanceClaimerProxy.erc20BalanceWithdrawer()),
-            abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector, _user, _erc20TokenBalances)
+            abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector, _user, _erc20Claim)
         );
     }
 
@@ -236,20 +236,20 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
         bytes32[] memory _tree = _mockRoot(_leaves);
 
         for (uint256 _i = 0; _i < _claimData.length; _i++) {
-            IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20TokenBalances = _getErc20TokenBalances(
+            IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20Claim = _getErc20TokenBalances(
                 _claimData[_i].balanceToken1, _claimData[_i].balanceToken2, _claimData[_i].balanceToken3
             );
-            _mockErc20BalanceWithdrawCallAndSetExpectCall(_users[_i], _erc20TokenBalances);
+            _mockErc20BalanceWithdrawCallAndSetExpectCall(_users[_i], _erc20Claim);
             _mockEthBalanceWithdrawCallAndSetExpectCall(_users[_i], _claimData[_i].ethBalance);
 
             vm.expectEmit(address(balanceClaimerProxy));
-            emit BalanceClaimed(_users[_i], _claimData[_i].ethBalance, _erc20TokenBalances);
+            emit BalanceClaimed(_users[_i], _claimData[_i].ethBalance, _erc20Claim);
 
             balanceClaimerProxy.claim(
                 merkleTreeGenerator.getProof(_tree, merkleTreeGenerator.getIndex(_tree, _leaves[_i])),
                 _users[_i],
                 _claimData[_i].ethBalance,
-                _erc20TokenBalances
+                _erc20Claim
             );
             assertTrue(balanceClaimerProxy.claimed(_users[_i]));
         }
@@ -262,14 +262,14 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
         bytes32[] memory _tree = _mockRoot(_leaves);
 
         for (uint256 _i = 0; _i < _claimData.length; _i++) {
-            IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20TokenBalances = _getErc20TokenBalances(
+            IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20Claim = _getErc20TokenBalances(
                 _claimData[_i].balanceToken1, _claimData[_i].balanceToken2, _claimData[_i].balanceToken3
             );
             bytes32[] memory _proof =
                 merkleTreeGenerator.getProof(_tree, merkleTreeGenerator.getIndex(_tree, _leaves[_i]));
 
             vm.expectRevert(IBalanceClaimer.NoBalanceToClaim.selector);
-            balanceClaimerProxy.claim(_proof, makeAddr("random"), _claimData[_i].ethBalance, _erc20TokenBalances);
+            balanceClaimerProxy.claim(_proof, makeAddr("random"), _claimData[_i].ethBalance, _erc20Claim);
         }
     }
 
@@ -280,19 +280,19 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
         bytes32[] memory _tree = _mockRoot(_leaves);
 
         for (uint256 _i = 0; _i < _claimData.length; _i++) {
-            IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20TokenBalances = _getErc20TokenBalances(
+            IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _erc20Claim = _getErc20TokenBalances(
                 _claimData[_i].balanceToken1, _claimData[_i].balanceToken2, _claimData[_i].balanceToken3
             );
             bytes32[] memory _proof =
                 merkleTreeGenerator.getProof(_tree, merkleTreeGenerator.getIndex(_tree, _leaves[_i]));
-            _mockErc20BalanceWithdrawCallAndSetExpectCall(_users[_i], _erc20TokenBalances);
+            _mockErc20BalanceWithdrawCallAndSetExpectCall(_users[_i], _erc20Claim);
             _mockEthBalanceWithdrawCallAndSetExpectCall(_users[_i], _claimData[_i].ethBalance);
 
-            balanceClaimerProxy.claim(_proof, _users[_i], _claimData[_i].ethBalance, _erc20TokenBalances);
+            balanceClaimerProxy.claim(_proof, _users[_i], _claimData[_i].ethBalance, _erc20Claim);
             assertTrue(balanceClaimerProxy.claimed(_users[_i]));
 
             vm.expectRevert(IBalanceClaimer.NoBalanceToClaim.selector);
-            balanceClaimerProxy.claim(_proof, _users[_i], _claimData[_i].ethBalance, _erc20TokenBalances);
+            balanceClaimerProxy.claim(_proof, _users[_i], _claimData[_i].ethBalance, _erc20Claim);
         }
     }
 }

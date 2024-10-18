@@ -165,7 +165,7 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     }
 
     /// @dev Test that the claim function reverts when the user is invalid
-    function test_claim_invalid_user_reverts() external {
+    function test_claim_reverts_InvalidUser() external {
         bytes32[] memory _aliceClaimerProofs =
             merkleTreeGenerator.getProof(tree, merkleTreeGenerator.getIndex(tree, leaves[0]));
 
@@ -181,7 +181,7 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     }
 
     /// @dev Test that the claim function reverts when the proof is invalid
-    function test_claim_invalid_proof_reverts() external {
+    function test_claim_reverts_InvalidProof() external {
         // using bob proofs instead of alice
         bytes32[] memory _aliceClaimerProofs =
             merkleTreeGenerator.getProof(tree, merkleTreeGenerator.getIndex(tree, leaves[1]));
@@ -193,7 +193,7 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     }
 
     /// @dev Test that the claim function reverts when the eth balance is invalid
-    function test_claim_invalid_eth_balance_reverts() external {
+    function test_claim_reverts_InvalidEthBalance() external {
         bytes32[] memory _aliceClaimerProofs =
             merkleTreeGenerator.getProof(tree, merkleTreeGenerator.getIndex(tree, leaves[0]));
 
@@ -208,7 +208,7 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     }
 
     /// @dev Test that the claim function reverts when the erc20 balance is invalid
-    function test_claim_invalid_erc20_balance_reverts() external {
+    function test_claim_reverts_InvalidErc20Balance() external {
         // using bob proofs instead of alice
         bytes32[] memory _aliceClaimerProofs =
             merkleTreeGenerator.getProof(tree, merkleTreeGenerator.getIndex(tree, leaves[0]));
