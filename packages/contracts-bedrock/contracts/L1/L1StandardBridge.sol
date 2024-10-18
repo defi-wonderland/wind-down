@@ -1,9 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Predeploys } from "../libraries/Predeploys.sol";
-import { StandardBridge } from "../universal/StandardBridge.sol";
-import { Semver } from "../universal/Semver.sol";
+// Libraries
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+
+// Interfaces
+import {IBalanceClaimer} from "./interfaces/winddown/IBalanceClaimer.sol";
+import {IErc20BalanceWithdrawer} from "./interfaces/winddown/IErc20BalanceWithdrawer.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+// Contracts
+import {Predeploys} from "../libraries/Predeploys.sol";
+import {StandardBridge} from "../universal/StandardBridge.sol";
+import {Semver} from "../universal/Semver.sol";
+
 
 /**
  * @custom:proxied
@@ -17,7 +28,9 @@ import { Semver } from "../universal/Semver.sol";
  *         of some token types that may not be properly supported by this contract include, but are
  *         not limited to: tokens with transfer fees, rebasing tokens, and tokens with blocklists.
  */
-contract L1StandardBridge is StandardBridge, Semver {
+contract L1StandardBridge is Initializable, StandardBridge, Semver, IErc20BalanceWithdrawer {
+    using SafeERC20 for IERC20;
+
     /**
      * @custom:legacy
      * @notice Emitted whenever a deposit of ETH from L1 into L2 is initiated.
@@ -27,12 +40,7 @@ contract L1StandardBridge is StandardBridge, Semver {
      * @param amount    Amount of ETH deposited.
      * @param extraData Extra data attached to the deposit.
      */
-    event ETHDepositInitiated(
-        address indexed from,
-        address indexed to,
-        uint256 amount,
-        bytes extraData
-    );
+    event ETHDepositInitiated(address indexed from, address indexed to, uint256 amount, bytes extraData);
 
     /**
      * @custom:legacy
@@ -43,12 +51,7 @@ contract L1StandardBridge is StandardBridge, Semver {
      * @param amount    Amount of ETH withdrawn.
      * @param extraData Extra data attached to the withdrawal.
      */
-    event ETHWithdrawalFinalized(
-        address indexed from,
-        address indexed to,
-        uint256 amount,
-        bytes extraData
-    );
+    event ETHWithdrawalFinalized(address indexed from, address indexed to, uint256 amount, bytes extraData);
 
     /**
      * @custom:legacy
@@ -90,6 +93,8 @@ contract L1StandardBridge is StandardBridge, Semver {
         bytes extraData
     );
 
+    IBalanceClaimer public balanceClaimer;
+
     /**
      * @custom:semver 1.1.0
      *
@@ -98,7 +103,19 @@ contract L1StandardBridge is StandardBridge, Semver {
     constructor(address payable _messenger)
         Semver(1, 1, 0)
         StandardBridge(_messenger, payable(Predeploys.L2_STANDARD_BRIDGE))
-    {}
+    {
+        initialize({_balanceClaimer: address(0)});
+    }
+
+    /**
+     * @custom:initializer
+     * @notice Initializes the L1StandardBridge contract.
+     *
+     * @param _balanceClaimer Address of the BalanceClaimer contract.
+     */
+    function initialize(address _balanceClaimer) public initializer {
+        balanceClaimer = IBalanceClaimer(_balanceClaimer);
+    }
 
     /**
      * @notice Allows EOAs to bridge ETH by sending directly to the bridge.
@@ -134,11 +151,7 @@ contract L1StandardBridge is StandardBridge, Semver {
      *                     execute any code on L2 and is only emitted as extra data for the
      *                     convenience of off-chain tooling.
      */
-    function depositETHTo(
-        address _to,
-        uint32 _minGasLimit,
-        bytes calldata _extraData
-    ) external payable {
+    function depositETHTo(address _to, uint32 _minGasLimit, bytes calldata _extraData) external payable {
         _initiateETHDeposit(msg.sender, _to, _minGasLimit, _extraData);
     }
 
@@ -161,15 +174,7 @@ contract L1StandardBridge is StandardBridge, Semver {
         uint32 _minGasLimit,
         bytes calldata _extraData
     ) external virtual onlyEOA {
-        _initiateERC20Deposit(
-            _l1Token,
-            _l2Token,
-            msg.sender,
-            msg.sender,
-            _amount,
-            _minGasLimit,
-            _extraData
-        );
+        _initiateERC20Deposit(_l1Token, _l2Token, msg.sender, msg.sender, _amount, _minGasLimit, _extraData);
     }
 
     /**
@@ -193,15 +198,7 @@ contract L1StandardBridge is StandardBridge, Semver {
         uint32 _minGasLimit,
         bytes calldata _extraData
     ) external virtual {
-        _initiateERC20Deposit(
-            _l1Token,
-            _l2Token,
-            msg.sender,
-            _to,
-            _amount,
-            _minGasLimit,
-            _extraData
-        );
+        _initiateERC20Deposit(_l1Token, _l2Token, msg.sender, _to, _amount, _minGasLimit, _extraData);
     }
 
     /**
@@ -213,12 +210,10 @@ contract L1StandardBridge is StandardBridge, Semver {
      * @param _amount    Amount of ETH to withdraw.
      * @param _extraData Optional data forwarded from L2.
      */
-    function finalizeETHWithdrawal(
-        address _from,
-        address _to,
-        uint256 _amount,
-        bytes calldata _extraData
-    ) external payable {
+    function finalizeETHWithdrawal(address _from, address _to, uint256 _amount, bytes calldata _extraData)
+        external
+        payable
+    {
         finalizeBridgeETH(_from, _to, _amount, _extraData);
     }
 
@@ -245,6 +240,22 @@ contract L1StandardBridge is StandardBridge, Semver {
     }
 
     /**
+     * @inheritdoc IErc20BalanceWithdrawer
+     * @notice Withdraws the ERC20 balance to the user.
+     * @param _user Address of the user.
+     * @param _erc20TokenBalances Array of Erc20BalanceClaim structs containing the token address
+     */
+    function withdrawErc20Balance(address _user, Erc20BalanceClaim[] calldata _erc20TokenBalances) external {
+        if (msg.sender != address(balanceClaimer)) {
+            revert CallerNotBalanceClaimer();
+        }
+
+        for (uint256 _i = 0; _i < _erc20TokenBalances.length; _i++) {
+            IERC20(_erc20TokenBalances[_i].token).safeTransfer(_user, _erc20TokenBalances[_i].balance);
+        }
+    }
+
+    /**
      * @custom:legacy
      * @notice Retrieves the access of the corresponding L2 bridge contract.
      *
@@ -262,12 +273,7 @@ contract L1StandardBridge is StandardBridge, Semver {
      * @param _minGasLimit Minimum gas limit for the deposit message on L2.
      * @param _extraData   Optional data to forward to L2.
      */
-    function _initiateETHDeposit(
-        address _from,
-        address _to,
-        uint32 _minGasLimit,
-        bytes memory _extraData
-    ) internal {
+    function _initiateETHDeposit(address _from, address _to, uint32 _minGasLimit, bytes memory _extraData) internal {
         _initiateBridgeETH(_from, _to, msg.value, _minGasLimit, _extraData);
     }
 
@@ -300,12 +306,10 @@ contract L1StandardBridge is StandardBridge, Semver {
      *
      * @inheritdoc StandardBridge
      */
-    function _emitETHBridgeInitiated(
-        address _from,
-        address _to,
-        uint256 _amount,
-        bytes memory _extraData
-    ) internal override {
+    function _emitETHBridgeInitiated(address _from, address _to, uint256 _amount, bytes memory _extraData)
+        internal
+        override
+    {
         emit ETHDepositInitiated(_from, _to, _amount, _extraData);
         super._emitETHBridgeInitiated(_from, _to, _amount, _extraData);
     }
@@ -316,12 +320,10 @@ contract L1StandardBridge is StandardBridge, Semver {
      *
      * @inheritdoc StandardBridge
      */
-    function _emitETHBridgeFinalized(
-        address _from,
-        address _to,
-        uint256 _amount,
-        bytes memory _extraData
-    ) internal override {
+    function _emitETHBridgeFinalized(address _from, address _to, uint256 _amount, bytes memory _extraData)
+        internal
+        override
+    {
         emit ETHWithdrawalFinalized(_from, _to, _amount, _extraData);
         super._emitETHBridgeFinalized(_from, _to, _amount, _extraData);
     }
