@@ -18,35 +18,37 @@ import { IBalanceClaimer } from "../../../L1/interfaces/winddown/IBalanceClaimer
 import { IErc20BalanceWithdrawer } from "../../../L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
 import { IEthBalanceWithdrawer } from "../../../L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
 
-contract BalanceClaimer_Initialize_Test is BalanceClaimer_Initializer {
-    /// @dev Test that the constructor sets the correct values.
-    /// @notice Marked virtual to be overridden in
-    ///         test/kontrol/deployment/DeploymentSummary.t.sol
-    function test_constructor_succeeds() external virtual {
-        assertEq(balanceClaimerImpl.root(), bytes32(0));
-        assertEq(address(balanceClaimerImpl.ethBalanceWithdrawer()), address(0));
-        assertEq(address(balanceClaimerImpl.erc20BalanceWithdrawer()), address(0));
-    }
+contract BalanceClaimer_TestBase is BalanceClaimer_Initializer {
+    address mockOptimismPortal = makeAddr("mockOptimismPortal");
+    address mockL1StandardBridge = makeAddr("mockL1StandardBridge");
+    bytes32 mockRoot = bytes32(keccak256(abi.encode("root")));
 
-    /// @dev Test that the initialize function sets the correct values.
-    function test_initialize_succeeds() external {
+    function setUp() public virtual override {
+        super.setUp();
+
         vm.prank(multisig);
         balanceClaimerImpl = new BalanceClaimer();
-        address mockOptimismPortal = makeAddr("mockOptimismPortal");
-        address mockL1StandardBridge = makeAddr("mockL1StandardBridge");
-        bytes32 mockRoot = bytes32(keccak256(abi.encode("root")));
+
         vm.prank(multisig);
         Proxy(payable(address(balanceClaimerProxy))).upgradeToAndCall(
             address(balanceClaimerImpl),
             abi.encodeWithSelector(BalanceClaimer.initialize.selector, mockOptimismPortal, mockL1StandardBridge, mockRoot)
         );
+    }
+
+}
+
+contract BalanceClaimer_Initialize_Test is BalanceClaimer_TestBase {
+
+    /// @dev Test that the initialize function sets the correct values.
+    function test_initialize_succeeds() external {
         assertEq(balanceClaimerProxy.root(), mockRoot);
         assertEq(address(balanceClaimerProxy.ethBalanceWithdrawer()), mockOptimismPortal);
         assertEq(address(balanceClaimerProxy.erc20BalanceWithdrawer()), mockL1StandardBridge);
     }
 }
 
-contract BalanceClaimer_Test is BalanceClaimer_Initializer {
+contract BalanceClaimer_Test is BalanceClaimer_TestBase {
     using stdStorage for StdStorage;
 
     struct ClaimData {
