@@ -25,6 +25,8 @@
     "autogen:artifacts": "ts-node scripts/generate-artifacts.ts",
     "autogen:invariant-docs": "ts-node scripts/invariant-doc-gen.ts",
     "deploy": "hardhat deploy",
+    "upgrade-prod:windown": "bash -c 'source .env && forge script scripts/winddown-upgrade/prod/Winddown.s.sol:WinddownUpgrade --rpc-url $ETHEREUM_MAINNET_RPC --broadcast'",
+    "upgrade-local:windown": "bash -c 'source .env && forge script scripts/winddown-upgrade/local/Winddown.s.sol:WinddownUpgrade --rpc-url $LOCAL_RPC --unlocked --broadcast'",
     "test": "yarn build:differential && yarn build:fuzz && forge test",
     "coverage": "yarn build:differential && yarn build:fuzz && forge coverage",
     "coverage:lcov": "yarn build:differential && yarn build:fuzz && forge coverage --report lcov",
