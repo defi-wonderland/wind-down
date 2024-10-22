@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+// Interfaces
+import { IErc20BalanceWithdrawer } from "../L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import { Bridge_Initializer } from "./CommonTest.t.sol";
 import { StandardBridge } from "../universal/StandardBridge.sol";
 import { OptimismPortal } from "../L1/OptimismPortal.sol";
@@ -17,7 +21,8 @@ contract L1StandardBridge_Getter_Test is Bridge_Initializer {
         assert(L1Bridge.OTHER_BRIDGE() == L2Bridge);
         assert(L1Bridge.messenger() == L1Messenger);
         assert(L1Bridge.MESSENGER() == L1Messenger);
-        assertEq(L1Bridge.version(), "1.1.0");
+        assertEq(L1Bridge.version(), "1.2.0");
+        assertEq(address(L1Bridge.BALANCE_CLAIMER()), address(balanceClaimerProxy));
     }
 }
 
@@ -28,6 +33,8 @@ contract L1StandardBridge_Initialize_Test is Bridge_Initializer {
         assertEq(address(L1Bridge.OTHER_BRIDGE()), Predeploys.L2_STANDARD_BRIDGE);
 
         assertEq(address(L2Bridge), Predeploys.L2_STANDARD_BRIDGE);
+
+        assertEq(address(L1Bridge.BALANCE_CLAIMER()), address(balanceClaimerProxy));
     }
 }
 
@@ -718,5 +725,81 @@ contract L1StandardBridge_FinalizeBridgeETH_TestFail is Bridge_Initializer {
         vm.prank(messenger);
         vm.expectRevert("StandardBridge: cannot send to messenger");
         L1Bridge.finalizeBridgeETH{ value: 100 }(alice, messenger, 100, hex"");
+    }
+}
+
+contract L1StandardBridge_WithdrawErc20Balance_Test is Bridge_Initializer {
+    using stdStorage for StdStorage;
+
+    /// @dev Mocks the tokens, set the expects the calls and returns the balances array parameter
+    function _mockTokensExpectCallsAndGetBalancesArray(
+        address _user,
+        bool _setExpectCall,
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[10] memory _fuzzBalances
+    )
+        internal
+        returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _balances)
+    {
+        uint8 _claimArraySize;
+        for (uint256 _i; _i < _fuzzBalances.length; _i++) {
+            assumeNoPrecompiles(_fuzzBalances[_i].token);
+            if (_fuzzBalances[_i].balance > 0) {
+                _claimArraySize++;
+                vm.mockCall(
+                    _fuzzBalances[_i].token,
+                    abi.encodeWithSelector(IERC20.transfer.selector, _user, _fuzzBalances[_i].balance),
+                    abi.encode(true)
+                );
+                if (_setExpectCall) {
+                    vm.expectCall(
+                        _fuzzBalances[_i].token,
+                        abi.encodeWithSelector(IERC20.transfer.selector, _user, _fuzzBalances[_i].balance)
+                    );
+                }
+            }
+        }
+
+        _balances = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](_claimArraySize);
+
+        uint256 _balancesIndex;
+        for (uint256 _i; _i < _fuzzBalances.length; _i++) {
+            if (_fuzzBalances[_i].balance > 0) {
+                _balances[_balancesIndex] = _fuzzBalances[_i];
+                _balancesIndex++;
+            }
+        }
+    }
+
+    /// @dev Tests that withdrawing ERC20 balances succeeds.
+    function testFuzz_withdrawErc20Balance_succeeds(
+        address _user,
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[10] memory _fuzzBalances
+    )
+        external
+    {
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _balances =
+            _mockTokensExpectCallsAndGetBalancesArray(_user, true, _fuzzBalances);
+
+        vm.prank(address(L1Bridge.BALANCE_CLAIMER()));
+        IErc20BalanceWithdrawer(address(L1Bridge)).withdrawErc20Balance(_user, _balances);
+    }
+
+    /// @dev Tests that withdrawing ERC20 balances reverts if the caller is not the balance claimer.
+    function testFuzz_withdrawErc20Balance_reverts(
+        address _user,
+        address _notBalanceClaimer,
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[10] memory _fuzzBalances
+    )
+        external
+    {
+        // calling from unauthorized address
+        vm.assume(_notBalanceClaimer != address(L1Bridge.BALANCE_CLAIMER()));
+
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _balances =
+            _mockTokensExpectCallsAndGetBalancesArray(_user, false, _fuzzBalances);
+
+        vm.prank(_notBalanceClaimer);
+        vm.expectRevert(IErc20BalanceWithdrawer.CallerNotBalanceClaimer.selector);
+        IErc20BalanceWithdrawer(address(L1Bridge)).withdrawErc20Balance(_user, _balances);
     }
 }

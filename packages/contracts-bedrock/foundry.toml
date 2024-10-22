@@ -29,3 +29,7 @@ fuzz_runs = 512
 
 [profile.echidna]
 bytecode_hash = 'ipfs'
+
+[rpc_endpoints]
+ethereum_mainnet = "${ETHEREUM_MAINNET_RPC}"
+local = "${LOCAL_RPC}"

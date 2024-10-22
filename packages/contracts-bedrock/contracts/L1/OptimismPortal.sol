@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+// Interfaces
+import { IEthBalanceWithdrawer } from "./interfaces/winddown/IEthBalanceWithdrawer.sol";
+import { IBalanceClaimer } from "./interfaces/winddown/IBalanceClaimer.sol";
+
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { SafeCall } from "../libraries/SafeCall.sol";
 import { L2OutputOracle } from "./L2OutputOracle.sol";
@@ -20,7 +24,7 @@ import { Semver } from "../universal/Semver.sol";
  *         and L2. Messages sent directly to the OptimismPortal have no form of replayability.
  *         Users are encouraged to use the L1CrossDomainMessenger for a higher-level interface.
  */
-contract OptimismPortal is Initializable, ResourceMetering, Semver {
+contract OptimismPortal is Initializable, ResourceMetering, Semver, IEthBalanceWithdrawer {
     /**
      * @notice Represents a proven withdrawal.
      *
@@ -83,6 +87,12 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
     bool public paused;
 
     /**
+     * @notice Address of the BalanceClaimer contract.
+     * @dev This contract is responsible for claiming the ETH balances of the OptimismPortal.
+     */
+    IBalanceClaimer public immutable BALANCE_CLAIMER;
+
+    /**
      * @notice Emitted when a transaction is deposited from L1 to L2. The parameters of this event
      *         are read by the rollup node and used to derive deposit transactions on L2.
      *
@@ -140,22 +150,25 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
     }
 
     /**
-     * @custom:semver 1.6.0
+     * @custom:semver 1.7.0
      *
      * @param _l2Oracle                  Address of the L2OutputOracle contract.
      * @param _guardian                  Address that can pause deposits and withdrawals.
      * @param _paused                    Sets the contract's pausability state.
      * @param _config                    Address of the SystemConfig contract.
+     * @param _balanceClaimer            Address of the BalanceClaimer contract.
      */
     constructor(
         L2OutputOracle _l2Oracle,
         address _guardian,
         bool _paused,
-        SystemConfig _config
-    ) Semver(1, 6, 0) {
+        SystemConfig _config,
+        address _balanceClaimer
+    ) Semver(1, 7, 0) {
         L2_ORACLE = _l2Oracle;
         GUARDIAN = _guardian;
         SYSTEM_CONFIG = _config;
+        BALANCE_CLAIMER = IBalanceClaimer(_balanceClaimer);
         initialize(_paused);
     }
 
@@ -480,6 +493,20 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
         // Emit a TransactionDeposited event so that the rollup node can derive a deposit
         // transaction for this deposit.
         emit TransactionDeposited(from, _to, DEPOSIT_VERSION, opaqueData);
+    }
+
+    /**
+     * @notice Withdraws the ETH balance to the user.
+     * @param _user       Address of the user.
+     * @param _ethClaim Amount of ETH to withdraw.
+     * @dev This function is only callable by the BalanceClaimer contract.
+     */
+    function withdrawEthBalance(address _user, uint256 _ethClaim) external {
+        if (msg.sender != address(BALANCE_CLAIMER)) revert CallerNotBalanceClaimer();
+        (bool success,) = _user.call{value: _ethClaim}("");
+        if (!success) {
+            revert IEthBalanceWithdrawer.EthTransferFailed();
+        }
     }
 
     /**
