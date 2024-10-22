@@ -35,7 +35,16 @@ contract WinddownUpgrade is Script {
         // Deploy BalanceClaimer implementation
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer();
 
-        console.log("BalanceClaimer implementation deployed at: ", address(balanceClaimerImpl));
+        // Set BalanceClaimer implementation
+        balanceClaimerProxy.upgradeToAndCall(
+            address(balanceClaimerImpl),
+            abi.encodeWithSelector(balanceClaimerImpl.initialize.selector, address(optimismPortalProxy), address(l1StandardBridgeProxy), WinddownConstants.MERKLE_ROOT)
+        );
+
+        // BalanceClaimer assertions
+        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ethBalanceWithdrawer()) == address(optimismPortalProxy));
+        assert(address(BalanceClaimer(address(balanceClaimerProxy)).erc20BalanceWithdrawer()) == address(l1StandardBridgeProxy));
+        assert(BalanceClaimer(address(balanceClaimerProxy)).root() == WinddownConstants.MERKLE_ROOT);
 
         vm.stopBroadcast();
 
@@ -46,7 +55,7 @@ contract WinddownUpgrade is Script {
         vm.startBroadcast(adminAddress);
 
         // Deploy OptimismPortal implementation
-        OptimismPortal newOpPortalImpl = new OptimismPortal({
+        OptimismPortal opPortalImpl = new OptimismPortal({
             _l2Oracle: L2OutputOracle(WinddownConstants.L2_ORACLE),
             _guardian: WinddownConstants.GUARDIAN,
             _paused: true,
@@ -56,7 +65,7 @@ contract WinddownUpgrade is Script {
 
         // Upgrade OptimismPortal
         optimismPortalProxy.upgradeTo(
-            address(newOpPortalImpl)
+            address(opPortalImpl)
         );
 
         // OptimismPortal assertions
@@ -87,20 +96,6 @@ contract WinddownUpgrade is Script {
         assert(address(L1StandardBridge(payable(address(l1StandardBridgeProxy))).BALANCE_CLAIMER()) == address(balanceClaimerProxy));
         assert(address(L1StandardBridge(payable(address(l1StandardBridgeProxy))).MESSENGER()) == WinddownConstants.MESSENGER);
 
-
-        vm.stopBroadcast();
-
-        // Set BalanceClaimer implementation
-        vm.startBroadcast(_deployer);
-        balanceClaimerProxy.upgradeToAndCall(
-            address(balanceClaimerImpl),
-            abi.encodeWithSelector(balanceClaimerImpl.initialize.selector, address(optimismPortalProxy), address(l1StandardBridgeProxy), WinddownConstants.MERKLE_ROOT)
-        );
-
-        // BalanceClaimer assertions
-        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ethBalanceWithdrawer()) == address(optimismPortalProxy));
-        assert(address(BalanceClaimer(address(balanceClaimerProxy)).erc20BalanceWithdrawer()) == address(l1StandardBridgeProxy));
-        assert(BalanceClaimer(address(balanceClaimerProxy)).root() == WinddownConstants.MERKLE_ROOT);
 
         vm.stopBroadcast();
     }
