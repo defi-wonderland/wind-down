@@ -6,7 +6,7 @@
 		"testLimit": 0,
 		"shrinkLimit": 5000,
 		"callSequenceLength": 100,
-		"corpusDirectory": "",
+		"corpusDirectory": "corpus",
 		"coverageEnabled": true,
 		"coverageFormats": [
 			"html",
@@ -27,7 +27,7 @@
 		"blockGasLimit": 125000000,
 		"transactionGasLimit": 12500000,
 		"testing": {
-			"stopOnFailedTest": true,
+			"stopOnFailedTest": false,
 			"stopOnFailedContractMatching": false,
 			"stopOnNoTests": true,
 			"testAllContracts": false,

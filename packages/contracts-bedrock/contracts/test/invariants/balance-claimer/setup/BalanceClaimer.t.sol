@@ -20,22 +20,21 @@ contract BalanceClaimerSetup is CommonBase {
     BalanceClaimer internal balanceClaimer;
 
     constructor() {
-        // _targetContract = new BalanceClaimer();
-        // optimismPortal = new OptimimismPortal({
-        //     _l2Oracle: L2OutputOracle(address(0)),
-        //     _guardian: address(0),
-        //     _config: SystemConfig(address(0))},
-        //     balanceClaimer: balanceClaimer);
-        // l1StandardBridge = new L1StandardBridge(address(0), address(balanceClaimer));
-        // Get the proxies for L1StandardBridge and OptimismPortal
-        L1ChugSplashProxy l1StandardBridgeProxy =
-            L1ChugSplashProxy(payable(address(WinddownConstants.L1_STANDARD_BRIDGE_PROXY)));
-        Proxy optimismPortalProxy = Proxy(payable(address(WinddownConstants.OPTIMISM_PORTAL_PROXY)));
-
-        // Deploy BalanceClaimer proxy
         Proxy balanceClaimerProxy = new Proxy(address(this));
 
-        // Deploy BalanceClaimer implementation
+        L1StandardBridge l1StandardBridgeImpl = new L1StandardBridge(payable(0), payable(address(balanceClaimerProxy)));
+        OptimismPortal optimismPortalImpl = new OptimismPortal({
+            _l2Oracle: L2OutputOracle(address(0)),
+            _guardian: address(0),
+            _paused: false,
+            _config: SystemConfig(address(0)),
+            _balanceClaimer: address(balanceClaimerProxy)
+        });
+        // Get the proxies for L1StandardBridge and OptimismPortal
+        L1ChugSplashProxy l1StandardBridgeProxy =
+            new L1ChugSplashProxy(address(this));
+        Proxy optimismPortalProxy = new Proxy(address(this));
+
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer();
 
         // Set BalanceClaimer implementation
@@ -45,9 +44,11 @@ contract BalanceClaimerSetup is CommonBase {
                 balanceClaimerImpl.initialize.selector,
                 address(optimismPortalProxy),
                 address(l1StandardBridgeProxy),
-                WinddownConstants.MERKLE_ROOT
+                bytes32(0)
             )
         );
+        optimismPortalProxy.upgradeTo(address(optimismPortalImpl));
+        l1StandardBridgeProxy.setCode(address(l1StandardBridgeImpl).code);
 
         optimismPortal = OptimismPortal(payable(optimismPortalProxy));
         l1StandardBridge = L1StandardBridge(payable(l1StandardBridgeProxy));
@@ -57,10 +58,10 @@ contract BalanceClaimerSetup is CommonBase {
     /// @custom:prop-id  0
     /// @custom:prop sanity checks for setup
     function property_setup() external {
-        assert(address(l1StandardBridge.BALANCE_CLAIMER()) == address(balanceClaimer));
         assert(address(optimismPortal.BALANCE_CLAIMER()) == address(balanceClaimer));
-        assert(address(balanceClaimer.ethBalanceWithdrawer()) == address(l1StandardBridge));
-        assert(address(balanceClaimer.erc20BalanceWithdrawer()) == address(optimismPortal));
+        assert(address(balanceClaimer.ethBalanceWithdrawer()) == address(optimismPortal));
+        assert(address(balanceClaimer.erc20BalanceWithdrawer()) == address(l1StandardBridge));
+        assert(address(l1StandardBridge.BALANCE_CLAIMER()) == address(balanceClaimer));
         assert(balanceClaimer.root() == bytes32(0));
     }
 }

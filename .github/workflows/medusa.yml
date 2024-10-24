@@ -14,6 +14,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup Node.js 16.x
+        uses: actions/setup-node@master
+        with:
+          node-version: 16.x
+          cache: yarn
+
       - name: Install dependencies
         working-directory: ./packages/contracts-bedrock
         run: yarn --frozen-lockfile --network-concurrency 1
