@@ -22,7 +22,7 @@ The fact that the state root is not writeable in the lifetime of the contract is
 ## mutate the state root
 Idea for this is to initialize the BalanceClaimer in the campaign constructor with either
 
-- [ ] an empty state root (for ...purity? ie allowing the fuzzer choose the inputs with the greatest variability) 
+- [ ] an empty state root (for ...purity? ie allowing the fuzzer choose the inputs with the greatest variability)
 - [ ] pre-filled state root (to cover code faster) and set of valid claims, with the downside of calls creating
 
 and have handlers to _add_ valid claims to the set, overwriting the state root
@@ -35,6 +35,8 @@ this would involve
 - [ ] not creating the balanceClaimer in the constructor
 - [ ] have a modifier (and an extra param of fuzzed input in every handler/property check) which will be used to initialize the state root on the first call
 - [ ] have all handlers afterwards only process claims (valid or not, obviously) and not create new ones
+
+This has the upside of being identical to the production setup, but would yield uglier code and potentially have worse pseudorandom input since we would be having all the state as fields of structs in arrays
 
 # nice to haves
 - [ ] use tokens' actual bytecode in the fuzzing campaign
