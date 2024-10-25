@@ -25,7 +25,7 @@ fs_permissions = [
 ]
 
 [profile.medusa]
-src='contracts'
+src='contracts/test/invariants/balance-claimer'
 test='contracts/test/invariants/balance-claimer'
 script='contracts/test/invariants/balance-claimer'
 
