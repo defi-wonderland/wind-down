@@ -10,14 +10,24 @@ import {L1ChugSplashProxy} from "contracts/legacy/L1ChugSplashProxy.sol";
 import {L2OutputOracle} from "contracts/L1/L2OutputOracle.sol";
 import {SystemConfig} from "contracts/L1/SystemConfig.sol";
 import {Proxy} from "contracts/universal/Proxy.sol";
-import {WinddownConstants} from "scripts/winddown-upgrade/WinddownConstants.sol";
+import {IERC20} from "forge-std/interfaces/IERC20.sol";
+import {MockERC20} from "forge-std/mocks/MockERC20.sol";
 
 import {CommonBase} from "forge-std/Base.sol";
 
-contract BalanceClaimerSetup is CommonBase {
+
+contract FuzzERC20 is MockERC20 {
+    function mint(address _to, uint256 _amount) public {
+        _mint(_to, _amount);
+    }
+}
+
+contract BalanceClaimerSetup is CommonBase{
+    uint256 internal constant INITIAL_BALANCE = 100000e18;
     L1StandardBridge internal l1StandardBridge;
     OptimismPortal internal optimismPortal;
     BalanceClaimer internal balanceClaimer;
+    IERC20[] internal supportedTokens;
 
     constructor() {
         Proxy balanceClaimerProxy = new Proxy(address(this));
@@ -31,8 +41,7 @@ contract BalanceClaimerSetup is CommonBase {
             _balanceClaimer: address(balanceClaimerProxy)
         });
         // Get the proxies for L1StandardBridge and OptimismPortal
-        L1ChugSplashProxy l1StandardBridgeProxy =
-            new L1ChugSplashProxy(address(this));
+        L1ChugSplashProxy l1StandardBridgeProxy = new L1ChugSplashProxy(address(this));
         Proxy optimismPortalProxy = new Proxy(address(this));
 
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer();
@@ -53,6 +62,14 @@ contract BalanceClaimerSetup is CommonBase {
         optimismPortal = OptimismPortal(payable(optimismPortalProxy));
         l1StandardBridge = L1StandardBridge(payable(l1StandardBridgeProxy));
         balanceClaimer = BalanceClaimer(address(balanceClaimerProxy));
+
+        for (uint256 i = 0; i < 4; i++) {
+            FuzzERC20 token = new FuzzERC20();
+            token.initialize("name", "symbol", i == 0 ? 6 : 18);
+            token.mint(address(l1StandardBridge), INITIAL_BALANCE);
+            supportedTokens.push(token);
+        }
+        vm.deal(address(optimismPortal), INITIAL_BALANCE);
     }
 
     /// @custom:prop-id  0
