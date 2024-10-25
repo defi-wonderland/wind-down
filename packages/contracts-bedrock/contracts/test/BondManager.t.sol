@@ -325,7 +325,7 @@ contract BondManager_Test is Test {
         unchecked {
             vm.assume(block.timestamp + minClaimHold > minClaimHold);
         }
-        assumeNoPrecompiles(owner);
+        assumeNotPrecompile(owner);
 
         // Post the bond
         vm.deal(address(this), amount);
