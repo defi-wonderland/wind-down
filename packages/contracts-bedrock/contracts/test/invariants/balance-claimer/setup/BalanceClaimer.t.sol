@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import "forge-std/console.sol";
-
 import {BalanceClaimer} from "contracts/L1/winddown/BalanceClaimer.sol";
 import {OptimismPortal} from "contracts/L1/OptimismPortal.sol";
 import {L1StandardBridge} from "contracts/L1/L1StandardBridge.sol";
@@ -10,24 +8,17 @@ import {L1ChugSplashProxy} from "contracts/legacy/L1ChugSplashProxy.sol";
 import {L2OutputOracle} from "contracts/L1/L2OutputOracle.sol";
 import {SystemConfig} from "contracts/L1/SystemConfig.sol";
 import {Proxy} from "contracts/universal/Proxy.sol";
-import {IERC20} from "forge-std/interfaces/IERC20.sol";
-import {MockERC20} from "forge-std/mocks/MockERC20.sol";
+
+import {FuzzERC20} from "./Tokens.t.sol";
+import {Claims} from "./Claims.t.sol";
 
 import {CommonBase} from "forge-std/Base.sol";
+import {StdUtils} from "forge-std/StdUtils.sol";
 
-
-contract FuzzERC20 is MockERC20 {
-    function mint(address _to, uint256 _amount) public {
-        _mint(_to, _amount);
-    }
-}
-
-contract BalanceClaimerSetup is CommonBase{
-    uint256 internal constant INITIAL_BALANCE = 100000e18;
+contract BalanceClaimerSetup is CommonBase, StdUtils, Claims {
     L1StandardBridge internal l1StandardBridge;
     OptimismPortal internal optimismPortal;
     BalanceClaimer internal balanceClaimer;
-    IERC20[] internal supportedTokens;
 
     constructor() {
         Proxy balanceClaimerProxy = new Proxy(address(this));
@@ -53,7 +44,7 @@ contract BalanceClaimerSetup is CommonBase{
                 balanceClaimerImpl.initialize.selector,
                 address(optimismPortalProxy),
                 address(l1StandardBridgeProxy),
-                bytes32(0)
+                tree[0]
             )
         );
         optimismPortalProxy.upgradeTo(address(optimismPortalImpl));
@@ -63,13 +54,11 @@ contract BalanceClaimerSetup is CommonBase{
         l1StandardBridge = L1StandardBridge(payable(l1StandardBridgeProxy));
         balanceClaimer = BalanceClaimer(address(balanceClaimerProxy));
 
-        for (uint256 i = 0; i < 4; i++) {
-            FuzzERC20 token = new FuzzERC20();
-            token.initialize("name", "symbol", i == 0 ? 6 : 18);
-            token.mint(address(l1StandardBridge), INITIAL_BALANCE);
-            supportedTokens.push(token);
-        }
+        // cant do this in Tokens because l1StandardBridge address is not set at that time
         vm.deal(address(optimismPortal), INITIAL_BALANCE);
+        for (uint256 i = 0; i < TOKENS; i++) {
+            FuzzERC20(address(supportedTokens[i])).mint(address(l1StandardBridge), INITIAL_BALANCE);
+        }
     }
 
     /// @custom:prop-id  0
@@ -79,6 +68,6 @@ contract BalanceClaimerSetup is CommonBase{
         assert(address(balanceClaimer.ethBalanceWithdrawer()) == address(optimismPortal));
         assert(address(balanceClaimer.erc20BalanceWithdrawer()) == address(l1StandardBridge));
         assert(address(l1StandardBridge.BALANCE_CLAIMER()) == address(balanceClaimer));
-        assert(balanceClaimer.root() == bytes32(0));
+        assert(balanceClaimer.root() == tree[0]);
     }
 }

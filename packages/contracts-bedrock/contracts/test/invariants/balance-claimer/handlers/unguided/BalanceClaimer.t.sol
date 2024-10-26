@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import "forge-std/console.sol";
-
 import {BalanceClaimerSetup} from "../../setup/BalanceClaimer.t.sol";
 import {IErc20BalanceWithdrawer} from "contracts/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
 import {IBalanceClaimer} from "contracts/L1/interfaces/winddown/IBalanceClaimer.sol";
@@ -23,13 +21,13 @@ contract BalanceClaimerUnguidedHandlers is BalanceClaimerSetup {
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20Claim,
         address _caller
     ) external {
+        bytes32 hash = _hashClaim(_user, _ethBalance, _erc20Claim);
         vm.prank(_caller);
         try balanceClaimer.claim(_proof, _user, _ethBalance, _erc20Claim) {
-            // TODO: check claim isnt in the valid set
-            assert(false); // random claim got accepted
+            assert(ghost_claimInTree[hash]);
+            assert(!ghost_claimed[hash]);
         } catch {
-            // TODO: assert claim is not in tree
-            // TODO: assert user already claimed
+            assert(!ghost_claimInTree[hash] || ghost_claimed[hash]);
         }
     }
 
@@ -39,30 +37,12 @@ contract BalanceClaimerUnguidedHandlers is BalanceClaimerSetup {
         uint256 _ethBalance,
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20Claim
     ) external {
+        bytes32 hash = _hashClaim(_user, _ethBalance, _erc20Claim);
         if (balanceClaimer.canClaim(_proof, _user, _ethBalance, _erc20Claim)) {
-            // TODO: check claim isnt in the valid set
-            assert(false); // random claim got accepted
+            assert(ghost_claimInTree[hash]);
+            assert(!ghost_claimed[hash]);
         } else {
-            // TODO: assert claim is not in tree
-            // TODO: assert user already claimed
+            assert(!ghost_claimInTree[hash] || ghost_claimed[hash]);
         }
-    }
-
-    function handler_withdrawEthBalance(address _user, uint256 _ethClaim, address _caller) external {
-        try optimismPortal.withdrawEthBalance(_user, _ethClaim) {
-            assert(_caller == address(balanceClaimer));
-            // TODO: update ghost variables
-        } catch {}
-    }
-
-    function handler_withdrawErc20Balance(
-        address _user,
-        IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _tokenClaims,
-        address _caller
-    ) external {
-        try l1StandardBridge.withdrawErc20Balance(_user, _tokenClaims) {
-            assert(_caller == address(balanceClaimer));
-            // TODO: update ghost variables
-        } catch {}
     }
 }
