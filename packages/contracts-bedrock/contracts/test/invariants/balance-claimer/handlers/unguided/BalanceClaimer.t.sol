@@ -25,9 +25,9 @@ contract BalanceClaimerUnguidedHandlers is BalanceClaimerSetup {
         vm.prank(_caller);
         try balanceClaimer.claim(_proof, _user, _ethBalance, _erc20Claim) {
             assert(ghost_claimInTree[hash]);
-            assert(!ghost_claimed[hash]);
+            assert(!ghost_claimed[_user]);
         } catch {
-            assert(!ghost_claimInTree[hash] || ghost_claimed[hash]);
+            assert(!ghost_claimInTree[hash] || ghost_claimed[_user]);
         }
     }
 
@@ -40,9 +40,9 @@ contract BalanceClaimerUnguidedHandlers is BalanceClaimerSetup {
         bytes32 hash = _hashClaim(_user, _ethBalance, _erc20Claim);
         if (balanceClaimer.canClaim(_proof, _user, _ethBalance, _erc20Claim)) {
             assert(ghost_claimInTree[hash]);
-            assert(!ghost_claimed[hash]);
+            assert(!ghost_claimed[_user]);
         } else {
-            assert(!ghost_claimInTree[hash] || ghost_claimed[hash]);
+            assert(!ghost_claimInTree[hash] || ghost_claimed[_user]);
         }
     }
 }

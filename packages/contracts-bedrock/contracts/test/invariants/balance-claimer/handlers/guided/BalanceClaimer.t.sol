@@ -12,13 +12,13 @@ contract BalanceClaimerGuidedHandlers is BalanceClaimerSetup {
         bytes32[] memory proof = getProof(tree, getIndex(tree, hashedClaim));
         vm.prank(msg.sender);
         try balanceClaimer.claim(proof, claim.user, claim.ethAmount, _claimToErc20ClaimArray(claim)) {
-            ghost_claimed[hashedClaim] = true;
+            ghost_claimed[claim.user] = true;
             ghost_claimedEther += claim.ethAmount;
             for (uint256 i = 0; i < claim.tokens.length; i++) {
                 ghost_claimedTokens[claim.tokens[i]] += claim.tokenAmounts[i];
             }
         } catch {
-            assert(ghost_claimed[hashedClaim]);
+            assert(ghost_claimed[claim.user]);
         }
     }
 }
