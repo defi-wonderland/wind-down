@@ -1,9 +1,9 @@
 #!/bin/sh
 
 claims_file=./setup/ClaimList.t.sol
-claims_amount=10
+claims_amount=100
+users_amount=100
 
-# Claims format:
 random_int() {
   # 2^ 64 - 2 , max range for shuf, == 18e18, not ideal.
   echo "$(shuf  -n 1 -i 0-18446744073709551614)"
@@ -35,7 +35,8 @@ contract ClaimsList {
         // remaining randomly-generated claims
 EOF
 for i in  $(seq "$claims_amount") ; do
-  recipient="0x00000000000000000000000000000000000$(shuf -n 1 -i 1-3)0000";
+  # have some overlap with medusa's actors
+  recipient="address($(shuf -n 1 -i 1-${users_amount}) << 16)";
   ethAmount=$(random_int)
   daiAmount=$(random_int)
   gtcAmount=$(random_int)
