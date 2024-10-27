@@ -2,9 +2,11 @@
 pragma solidity 0.8.15;
 
 import {IErc20BalanceWithdrawer} from "contracts/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
+import {MerkleTreeGenerator} from "contracts/test/libraries/MerkleTreeGenerator.t.sol";
 import {Tokens} from "./Tokens.t.sol";
+import {ClaimsList} from "./ClaimList.t.sol";
 
-contract Claims is Tokens {
+contract Claims is Tokens, ClaimsList, MerkleTreeGenerator {
     struct Claim {
         address user;
         uint256 ethAmount;
@@ -13,20 +15,42 @@ contract Claims is Tokens {
     }
 
     bytes32[] internal tree;
+    bytes32[] internal leaves;
     Claim[] internal ghost_validClaims;
-    mapping(bytes32 => bool) internal ghost_claimed;
+    mapping(address => bool) internal ghost_claimed;
     mapping(bytes32 => bool) internal ghost_claimInTree;
+    // only used as dynamic array
+    address[] private _tokens;
+    // only used as dynamic array
+    uint256[] private _amounts;
 
     constructor() {
-        address user = 0x0000000000000000000000000000000000010000;
-        address[] memory tokens = new address[](1);
-        tokens[0] = address(supportedTokens[0]);
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 1 ether;
-        Claim memory claim = Claim({user: user, ethAmount: 1 ether, tokens: tokens, tokenAmounts: amounts});
-        ghost_validClaims.push(claim);
-        ghost_claimInTree[_hashClaim(claim)] = true;
-        tree.push(_hashClaim(claim));
+        for (uint256 i = 0; i < randomClaims.length; i++) {
+            ClaimEntry memory rawClaim = randomClaims[i];
+            if (rawClaim.daiAmount > 0) {
+                _tokens.push(address(supportedTokens[0]));
+                _amounts.push(rawClaim.daiAmount);
+            }
+            if (rawClaim.gtcAmount > 0) {
+                _tokens.push(address(supportedTokens[1]));
+                _amounts.push(rawClaim.gtcAmount);
+            }
+            if (rawClaim.usdtAmount > 0) {
+                _tokens.push(address(supportedTokens[2]));
+                _amounts.push(rawClaim.usdtAmount);
+            }
+            if (rawClaim.usdcAmount > 0) {
+                _tokens.push(address(supportedTokens[3]));
+                _amounts.push(rawClaim.usdcAmount);
+            }
+            Claim memory claim =
+                Claim({user: rawClaim.recipient, ethAmount: rawClaim.ethAmount, tokens: _tokens, tokenAmounts: _amounts});
+            delete _amounts;
+            delete _tokens;
+            ghost_validClaims.push(claim);
+            leaves.push(_hashClaim(claim));
+        }
+        tree = generateMerkleTree(leaves);
     }
 
     function _hashClaim(Claim memory claim) internal pure returns (bytes32) {

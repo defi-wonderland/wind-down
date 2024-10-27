@@ -8,8 +8,8 @@ contract BalanceClaimerGuidedHandlers is BalanceClaimerSetup {
     function handler_claim(uint256 claimIndex) external {
         claimIndex = bound(claimIndex, 0, ghost_validClaims.length - 1);
         Claim memory claim = ghost_validClaims[claimIndex];
-        bytes32[] memory proof = new bytes32[](0);
         bytes32 hashedClaim = _hashClaim(claim);
+        bytes32[] memory proof = getProof(tree, getIndex(tree, hashedClaim));
         vm.prank(msg.sender);
         try balanceClaimer.claim(proof, claim.user, claim.ethAmount, _claimToErc20ClaimArray(claim)) {
             ghost_claimed[hashedClaim] = true;
