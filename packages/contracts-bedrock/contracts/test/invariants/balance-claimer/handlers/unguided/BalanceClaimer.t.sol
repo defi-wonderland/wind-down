@@ -9,6 +9,7 @@ contract BalanceClaimerUnguidedHandlers is BalanceClaimerSetup {
     function handler_initialize(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root)
         external
     {
+        // prop-id 7
         try balanceClaimer.initialize(_ethBalanceWithdrawer, _erc20BalanceWithdrawer, _root) {
             assert(false); // balanceClaimer should only be initialized once
         } catch {}
@@ -24,10 +25,16 @@ contract BalanceClaimerUnguidedHandlers is BalanceClaimerSetup {
         bytes32 hash = _hashClaim(_user, _ethBalance, _erc20Claim);
         vm.prank(_caller);
         try balanceClaimer.claim(_proof, _user, _ethBalance, _erc20Claim) {
+            //prop-id 1
             assert(ghost_claimInTree[hash]);
-            assert(!ghost_claimed[_user]);
+            //prop-id 2;
+            assert(!ghost_claimed[_user])
+            ghost_claimed[_user]=true;
         } catch {
-            assert(!ghost_claimInTree[hash] || ghost_claimed[_user]);
+            assert(
+                !ghost_claimInTree[hash] // prop-id 4
+                    || ghost_claimed[_user] //prop-id 3
+            );
         }
     }
 
@@ -39,10 +46,15 @@ contract BalanceClaimerUnguidedHandlers is BalanceClaimerSetup {
     ) external {
         bytes32 hash = _hashClaim(_user, _ethBalance, _erc20Claim);
         if (balanceClaimer.canClaim(_proof, _user, _ethBalance, _erc20Claim)) {
+            //prop-id 1
             assert(ghost_claimInTree[hash]);
+            // prop-id 2
             assert(!ghost_claimed[_user]);
         } else {
-            assert(!ghost_claimInTree[hash] || ghost_claimed[_user]);
+            assert(
+                !ghost_claimInTree[hash] // prop-id 4
+                    || ghost_claimed[_user] //prop-id 3
+            );
         }
     }
 }

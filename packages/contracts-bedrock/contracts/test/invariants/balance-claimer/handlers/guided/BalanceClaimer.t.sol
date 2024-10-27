@@ -11,6 +11,7 @@ contract BalanceClaimerGuidedHandlers is BalanceClaimerSetup {
         bytes32 hashedClaim = _hashClaim(claim);
         bytes32[] memory proof = getProof(tree, getIndex(tree, hashedClaim));
         vm.prank(msg.sender);
+        // prop-id 1
         try balanceClaimer.claim(proof, claim.user, claim.ethAmount, _claimToErc20ClaimArray(claim)) {
             ghost_claimed[claim.user] = true;
             ghost_claimedEther += claim.ethAmount;
@@ -18,6 +19,7 @@ contract BalanceClaimerGuidedHandlers is BalanceClaimerSetup {
                 ghost_claimedTokens[claim.tokens[i]] += claim.tokenAmounts[i];
             }
         } catch {
+            // prop-id 2
             assert(ghost_claimed[claim.user]);
         }
     }
