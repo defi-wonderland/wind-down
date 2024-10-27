@@ -43,8 +43,12 @@ contract Claims is Tokens, ClaimsList, MerkleTreeGenerator {
                 _tokens.push(address(supportedTokens[3]));
                 _amounts.push(rawClaim.usdcAmount);
             }
-            Claim memory claim =
-                Claim({user: rawClaim.recipient, ethAmount: rawClaim.ethAmount, tokens: _tokens, tokenAmounts: _amounts});
+            Claim memory claim = Claim({
+                user: rawClaim.recipient,
+                ethAmount: rawClaim.ethAmount,
+                tokens: _tokens,
+                tokenAmounts: _amounts
+            });
             delete _amounts;
             delete _tokens;
             ghost_validClaims.push(claim);

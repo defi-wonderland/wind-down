@@ -18,6 +18,6 @@ contract BalanceClaimerProperties is BalanceClaimerSetup {
     /// @custom:property-id 6
     /// @custom:property OptimismPortal.balance == initialBalance - sum of claims
     function property_ethBalancesSum() external view {
-        assert(address(optimismPortal).balance == INITIAL_BALANCE- ghost_claimedEther);
+        assert(address(optimismPortal).balance == INITIAL_BALANCE - ghost_claimedEther);
     }
 }
