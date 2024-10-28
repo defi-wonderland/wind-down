@@ -81,7 +81,7 @@ contract WinddownUpgrade is Script {
         vm.stopBroadcast();
 
         // Get the admin address of the L1StandardBridge
-        storageData = vm.load(address(optimismPortalProxy), WinddownConstants.OWNER_KEY);
+        storageData = vm.load(address(optimismPortalProxy), OWNER_KEY);
         adminAddress = address(uint160(uint256(storageData)));
 
         vm.startBroadcast(adminAddress);
