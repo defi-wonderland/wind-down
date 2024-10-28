@@ -100,11 +100,8 @@ contract L1StandardBridge is StandardBridge, Semver, IErc20BalanceWithdrawer {
         bytes extraData
     );
 
-    /**
-     * @notice Address of the balance claimer contract.
-     * @dev This contract is responsible for claiming the ERC20 balances of the bridge.
-     */
-    IBalanceClaimer public immutable BALANCE_CLAIMER;
+    /// @inheritdoc IErc20BalanceWithdrawer
+    address public immutable BALANCE_CLAIMER;
 
     /**
      * @custom:semver 1.2.0
@@ -115,7 +112,7 @@ contract L1StandardBridge is StandardBridge, Semver, IErc20BalanceWithdrawer {
         Semver(1, 2, 0)
         StandardBridge(_messenger, payable(Predeploys.L2_STANDARD_BRIDGE))
     {
-        BALANCE_CLAIMER = IBalanceClaimer(_balanceClaimer);
+        BALANCE_CLAIMER = _balanceClaimer;
     }
 
     /**
@@ -262,14 +259,9 @@ contract L1StandardBridge is StandardBridge, Semver, IErc20BalanceWithdrawer {
         finalizeBridgeERC20(_l1Token, _l2Token, _from, _to, _amount, _extraData);
     }
 
-    /**
-     * @inheritdoc IErc20BalanceWithdrawer
-     * @notice Withdraws the ERC20 balance to the user.
-     * @param _user Address of the user.
-     * @param _erc20Claim Array of Erc20BalanceClaim structs containing the token address
-     */
+    /// @inheritdoc IErc20BalanceWithdrawer
     function withdrawErc20Balance(address _user, Erc20BalanceClaim[] calldata _erc20Claim) external {
-        if (msg.sender != address(BALANCE_CLAIMER)) {
+        if (msg.sender != BALANCE_CLAIMER) {
             revert CallerNotBalanceClaimer();
         }
 

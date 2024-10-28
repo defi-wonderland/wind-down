@@ -86,11 +86,8 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver, IEthBalanceW
      */
     bool public paused;
 
-    /**
-     * @notice Address of the BalanceClaimer contract.
-     * @dev This contract is responsible for claiming the ETH balances of the OptimismPortal.
-     */
-    IBalanceClaimer public immutable BALANCE_CLAIMER;
+    /// @inheritdoc IEthBalanceWithdrawer
+    address public immutable BALANCE_CLAIMER;
 
     /**
      * @notice Emitted when a transaction is deposited from L1 to L2. The parameters of this event
@@ -168,7 +165,7 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver, IEthBalanceW
         L2_ORACLE = _l2Oracle;
         GUARDIAN = _guardian;
         SYSTEM_CONFIG = _config;
-        BALANCE_CLAIMER = IBalanceClaimer(_balanceClaimer);
+        BALANCE_CLAIMER = _balanceClaimer;
         initialize(_paused);
     }
 
@@ -495,14 +492,9 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver, IEthBalanceW
         emit TransactionDeposited(from, _to, DEPOSIT_VERSION, opaqueData);
     }
 
-    /**
-     * @notice Withdraws the ETH balance to the user.
-     * @param _user       Address of the user.
-     * @param _ethClaim Amount of ETH to withdraw.
-     * @dev This function is only callable by the BalanceClaimer contract.
-     */
+    /// @inheritdoc IEthBalanceWithdrawer
     function withdrawEthBalance(address _user, uint256 _ethClaim) external {
-        if (msg.sender != address(BALANCE_CLAIMER)) revert CallerNotBalanceClaimer();
+        if (msg.sender != BALANCE_CLAIMER) revert CallerNotBalanceClaimer();
         (bool success,) = _user.call{value: _ethClaim}("");
         if (!success) {
             revert IEthBalanceWithdrawer.EthTransferFailed();

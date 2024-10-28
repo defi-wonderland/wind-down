@@ -30,13 +30,14 @@ contract WinddownUpgrade is Script {
         Proxy balanceClaimerProxy = new Proxy(_deployer);
 
         // Deploy BalanceClaimer implementation
-        BalanceClaimer balanceClaimerImpl = new BalanceClaimer();
+        BalanceClaimer balanceClaimerImpl = new BalanceClaimer({
+            _ethBalanceWithdrawer: address(optimismPortalProxy),
+            _erc20BalanceWithdrawer: address(l1StandardBridgeProxy),
+            _root: WinddownConstants.MERKLE_ROOT
+        });
 
          // Set BalanceClaimer implementation
-        balanceClaimerProxy.upgradeToAndCall(
-            address(balanceClaimerImpl),
-            abi.encodeWithSelector(balanceClaimerImpl.initialize.selector, address(optimismPortalProxy), address(l1StandardBridgeProxy), WinddownConstants.MERKLE_ROOT)
-        );
+        balanceClaimerProxy.upgradeTo(address(balanceClaimerImpl));
 
         // BalanceClaimer assertions
         assert(address(BalanceClaimer(address(balanceClaimerProxy)).ethBalanceWithdrawer()) == address(optimismPortalProxy));

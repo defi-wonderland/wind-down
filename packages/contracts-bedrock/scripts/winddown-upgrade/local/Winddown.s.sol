@@ -17,6 +17,8 @@ import { L2OutputOracle } from "../../../contracts/L1/L2OutputOracle.sol";
 import { SystemConfig } from "../../../contracts/L1/SystemConfig.sol";
 
 contract WinddownUpgrade is Script {
+    bytes32 internal constant OWNER_KEY = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
     function run() public {
         uint256 _deployerPk = vm.envUint("PRIVATE_KEY_PROXY_ADMIN");
         address _deployer = vm.addr(_deployerPk);
@@ -33,13 +35,14 @@ contract WinddownUpgrade is Script {
         console.log("BalanceClaimer proxy deployed at: ", address(balanceClaimerProxy));
 
         // Deploy BalanceClaimer implementation
-        BalanceClaimer balanceClaimerImpl = new BalanceClaimer();
+        BalanceClaimer balanceClaimerImpl = new BalanceClaimer({
+            _ethBalanceWithdrawer: address(optimismPortalProxy),
+            _erc20BalanceWithdrawer: address(l1StandardBridgeProxy),
+            _root: WinddownConstants.MERKLE_ROOT
+        });
 
         // Set BalanceClaimer implementation
-        balanceClaimerProxy.upgradeToAndCall(
-            address(balanceClaimerImpl),
-            abi.encodeWithSelector(balanceClaimerImpl.initialize.selector, address(optimismPortalProxy), address(l1StandardBridgeProxy), WinddownConstants.MERKLE_ROOT)
-        );
+        balanceClaimerProxy.upgradeTo(address(balanceClaimerImpl));
 
         // BalanceClaimer assertions
         assert(address(BalanceClaimer(address(balanceClaimerProxy)).ethBalanceWithdrawer()) == address(optimismPortalProxy));
@@ -49,7 +52,7 @@ contract WinddownUpgrade is Script {
         vm.stopBroadcast();
 
         // Get the admin address of the OptimismPortal
-        bytes32 storageData = vm.load(address(optimismPortalProxy), WinddownConstants.OWNER_KEY);
+        bytes32 storageData = vm.load(address(optimismPortalProxy), OWNER_KEY);
         address adminAddress = address(uint160(uint256(storageData)));
 
         vm.startBroadcast(adminAddress);
@@ -95,7 +98,6 @@ contract WinddownUpgrade is Script {
         // L1StandardBridge assertions
         assert(address(L1StandardBridge(payable(address(l1StandardBridgeProxy))).BALANCE_CLAIMER()) == address(balanceClaimerProxy));
         assert(address(L1StandardBridge(payable(address(l1StandardBridgeProxy))).MESSENGER()) == WinddownConstants.MESSENGER);
-
 
         vm.stopBroadcast();
     }

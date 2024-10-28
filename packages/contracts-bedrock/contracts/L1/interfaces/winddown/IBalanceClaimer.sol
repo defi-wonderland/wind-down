@@ -25,20 +25,28 @@ interface IBalanceClaimer {
     /// @notice Thrown when the user has no balance to claim
     error NoBalanceToClaim();
 
+    /// @notice Thrown when the merkle root is invalid
+    error InvalidMerkleRoot();
+
+    /// @notice the root of the merkle tree
     function root() external view returns (bytes32);
 
+    /// @notice OptimismPortal ethBalanceWithdrawer contract
     function ethBalanceWithdrawer() external view returns (IEthBalanceWithdrawer);
 
+     /// @notice erc20BalanceWithdrawer contract
     function erc20BalanceWithdrawer() external view returns (IErc20BalanceWithdrawer);
 
+    /// @notice return users who claimed their balances
     function claimed(address) external view returns (bool);
 
-    function initialize(
-        address _ethBalanceWithdrawer,
-        address _erc20BalanceWithdrawer,
-        bytes32 _root
-    ) external;
-
+    /**
+     * @notice Claims the tokens for the user
+     * @param _proof The merkle proof
+     * @param _user The user address
+     * @param _ethBalance The eth balance of the user
+     * @param _erc20Claim The ERC20 tokens balances of the user
+     */
     function claim(
         bytes32[] calldata _proof,
         address _user,
@@ -46,6 +54,14 @@ interface IBalanceClaimer {
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20Claim
     ) external;
 
+    /**
+     * @notice Checks if the user can claim the tokens
+     * @param _proof The merkle proof
+     * @param _user The user address
+     * @param _ethBalance The eth balance of the user
+     * @param _erc20Claim The ERC20 tokens balances of the user
+     * @return _canClaimTokens True if the user can claim the tokens
+     */
     function canClaim(
         bytes32[] calldata _proof,
         address _user,

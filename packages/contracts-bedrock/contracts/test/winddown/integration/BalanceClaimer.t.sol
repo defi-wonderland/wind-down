@@ -47,13 +47,15 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     function setUp() public override {
         super.setUp();
 
-        balanceClaimerImpl = new BalanceClaimer();
-        // The Balance Claimer is initialized with the Merkle root and when L1StandardBridge and OptimismPortal are deployed
+        // The Balance Claimer is deployed with the Merkle root and when L1StandardBridge and OptimismPortal are deployed
+        balanceClaimerImpl = new BalanceClaimer({
+            _ethBalanceWithdrawer: address(op),
+            _erc20BalanceWithdrawer: address(L1Bridge),
+            _root: keccak256("mockRoot")
+        });
+
         vm.prank(multisig);
-        Proxy(payable(address(balanceClaimerProxy))).upgradeToAndCall(
-            address(balanceClaimerImpl),
-            abi.encodeWithSelector(BalanceClaimer.initialize.selector, address(op), address(L1Bridge), bytes32(0))
-        );
+        Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(balanceClaimerImpl));
 
         merkleTreeGenerator = new MerkleTreeGenerator();
 
@@ -119,7 +121,14 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     function _mockRoot(bytes32[] memory _leaves) internal returns (bytes32[] memory _tree) {
         _tree = merkleTreeGenerator.generateMerkleTree(_leaves);
         bytes32 _root = _tree[0];
-        stdstore.target(address(balanceClaimerProxy)).sig(IBalanceClaimer.root.selector).checked_write(_root);
+
+        balanceClaimerImpl = new BalanceClaimer({
+            _ethBalanceWithdrawer: address(op),
+            _erc20BalanceWithdrawer: address(L1Bridge),
+            _root: _root
+        });
+        vm.prank(multisig);
+        Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(balanceClaimerImpl));
     }
 
     /// @dev Test that the claim function succeeds

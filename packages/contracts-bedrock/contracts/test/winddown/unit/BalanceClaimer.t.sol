@@ -21,27 +21,28 @@ import { IEthBalanceWithdrawer } from "../../../L1/interfaces/winddown/IEthBalan
 contract BalanceClaimer_TestBase is BalanceClaimer_Initializer {
     address mockOptimismPortal = makeAddr("mockOptimismPortal");
     address mockL1StandardBridge = makeAddr("mockL1StandardBridge");
-    bytes32 mockRoot = bytes32(keccak256(abi.encode("root")));
+    bytes32 mockRoot = keccak256("mockRoot");
 
     function setUp() public virtual override {
         super.setUp();
 
         vm.prank(multisig);
-        balanceClaimerImpl = new BalanceClaimer();
+        balanceClaimerImpl = new BalanceClaimer({
+            _ethBalanceWithdrawer: address(mockOptimismPortal),
+            _erc20BalanceWithdrawer: address(mockL1StandardBridge),
+            _root: mockRoot
+        });
 
         vm.prank(multisig);
-        Proxy(payable(address(balanceClaimerProxy))).upgradeToAndCall(
-            address(balanceClaimerImpl),
-            abi.encodeWithSelector(BalanceClaimer.initialize.selector, mockOptimismPortal, mockL1StandardBridge, mockRoot)
-        );
+        Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(balanceClaimerImpl));
     }
 
 }
 
-contract BalanceClaimer_Initialize_Test is BalanceClaimer_TestBase {
+contract BalanceClaimer_Constructor_Test is BalanceClaimer_TestBase {
 
-    /// @dev Test that the initialize function sets the correct values.
-    function test_initialize_succeeds() external {
+    /// @dev Test that the constructor sets the correct values.
+    function test_constructor_succeeds() external {
         assertEq(balanceClaimerProxy.root(), mockRoot);
         assertEq(address(balanceClaimerProxy.ethBalanceWithdrawer()), mockOptimismPortal);
         assertEq(address(balanceClaimerProxy.erc20BalanceWithdrawer()), mockL1StandardBridge);
@@ -136,7 +137,14 @@ contract BalanceClaimer_Test is BalanceClaimer_TestBase {
     function _mockRoot(bytes32[] memory _leaves) internal returns (bytes32[] memory _tree) {
         _tree = merkleTreeGenerator.generateMerkleTree(_leaves);
         bytes32 _root = _tree[0];
-        stdstore.target(address(balanceClaimerProxy)).sig(IBalanceClaimer.root.selector).checked_write(_root);
+
+        balanceClaimerImpl = new BalanceClaimer({
+            _ethBalanceWithdrawer: address(mockOptimismPortal),
+            _erc20BalanceWithdrawer: address(mockL1StandardBridge),
+            _root: _root
+        });
+        vm.prank(multisig);
+        Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(balanceClaimerImpl));
     }
 
     /// @dev Mock the erc20 balance withdraw call and set the expect call if at least one balance is greater than 0

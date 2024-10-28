@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 // Libraries
 import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 // Interfaces
 import { IEthBalanceWithdrawer } from "../interfaces/winddown/IEthBalanceWithdrawer.sol";
@@ -15,48 +14,33 @@ import { Semver } from "../../universal/Semver.sol";
   * @custom:proxied
   * @notice Contract that allows users to claim and withdraw their eth and erc20 balances
  */
-contract BalanceClaimer is Initializable, Semver, IBalanceClaimer {
-    /// @notice the root of the merkle tree
-    bytes32 public root;
+contract BalanceClaimer is Semver, IBalanceClaimer {
+    /// @inheritdoc IBalanceClaimer
+    bytes32 public immutable root;
 
-    /// @notice OptimismPortal proxy address
-    IEthBalanceWithdrawer public ethBalanceWithdrawer;
+    /// @inheritdoc IBalanceClaimer
+    IEthBalanceWithdrawer public immutable ethBalanceWithdrawer;
 
-    /// @notice L1StandardBridge proxy address
-    IErc20BalanceWithdrawer public erc20BalanceWithdrawer;
+    /// @inheritdoc IBalanceClaimer
+    IErc20BalanceWithdrawer public immutable erc20BalanceWithdrawer;
 
-    /// @notice The mapping of users who have claimed their balances
+    /// @inheritdoc IBalanceClaimer
     mapping(address => bool) public claimed;
 
     /**
-     * @custom:semver 1.7.0
-     */
-    constructor() Semver(1, 0, 0) {
-        initialize({_ethBalanceWithdrawer: address(0), _erc20BalanceWithdrawer: address(0), _root: bytes32(0)});
-    }
-
-    /**
-     * @notice Initializer
+     * @custom:semver 1.0.0
      * @param _ethBalanceWithdrawer The EthBalanceWithdrawer address
      * @param _erc20BalanceWithdrawer The Erc20BalanceWithdrawer address
      * @param _root The root of the merkle tree
      */
-    function initialize(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root)
-        public
-        initializer
-    {
+    constructor(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root) Semver(1, 0, 0) {
+        if (_root == 0) revert InvalidMerkleRoot();
         ethBalanceWithdrawer = IEthBalanceWithdrawer(_ethBalanceWithdrawer);
         erc20BalanceWithdrawer = IErc20BalanceWithdrawer(_erc20BalanceWithdrawer);
         root = _root;
     }
 
-    /**
-     * @notice Claims the tokens for the user
-     * @param _proof The merkle proof
-     * @param _user The user address
-     * @param _ethBalance The eth balance of the user
-     * @param _erc20Claim The ERC20 tokens balances of the user
-     */
+    /// @inheritdoc IBalanceClaimer
     function claim(
         bytes32[] calldata _proof,
         address _user,
@@ -77,14 +61,7 @@ contract BalanceClaimer is Initializable, Semver, IBalanceClaimer {
         emit BalanceClaimed({user: _user, ethBalance: _ethBalance, erc20TokenBalances: _erc20Claim});
     }
 
-    /**
-     * @notice Checks if the user can claim the tokens
-     * @param _proof The merkle proof
-     * @param _user The user address
-     * @param _ethBalance The eth balance of the user
-     * @param _erc20Claim The ERC20 tokens balances of the user
-     * @return _canClaimTokens True if the user can claim the tokens
-     */
+    /// @inheritdoc IBalanceClaimer
     function canClaim(
         bytes32[] calldata _proof,
         address _user,
