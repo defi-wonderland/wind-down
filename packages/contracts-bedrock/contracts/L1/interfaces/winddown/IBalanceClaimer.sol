@@ -29,13 +29,13 @@ interface IBalanceClaimer {
     error InvalidMerkleRoot();
 
     /// @notice the root of the merkle tree
-    function root() external view returns (bytes32);
+    function ROOT() external view returns (bytes32);
 
     /// @notice OptimismPortal ethBalanceWithdrawer contract
-    function ethBalanceWithdrawer() external view returns (IEthBalanceWithdrawer);
+    function ETH_BALANCE_WITHDRAWER() external view returns (IEthBalanceWithdrawer);
 
      /// @notice erc20BalanceWithdrawer contract
-    function erc20BalanceWithdrawer() external view returns (IErc20BalanceWithdrawer);
+    function ERC20_BALANCE_WITHDRAWER() external view returns (IErc20BalanceWithdrawer);
 
     /// @notice return users who claimed their balances
     function claimed(address) external view returns (bool);

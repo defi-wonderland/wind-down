@@ -43,9 +43,9 @@ contract BalanceClaimer_Constructor_Test is BalanceClaimer_TestBase {
 
     /// @dev Test that the constructor sets the correct values.
     function test_constructor_succeeds() external {
-        assertEq(balanceClaimerProxy.root(), mockRoot);
-        assertEq(address(balanceClaimerProxy.ethBalanceWithdrawer()), mockOptimismPortal);
-        assertEq(address(balanceClaimerProxy.erc20BalanceWithdrawer()), mockL1StandardBridge);
+        assertEq(balanceClaimerProxy.ROOT(), mockRoot);
+        assertEq(address(balanceClaimerProxy.ETH_BALANCE_WITHDRAWER()), mockOptimismPortal);
+        assertEq(address(balanceClaimerProxy.ERC20_BALANCE_WITHDRAWER()), mockL1StandardBridge);
     }
 }
 
@@ -165,13 +165,13 @@ contract BalanceClaimer_Test is BalanceClaimer_TestBase {
             return;
         }
         vm.mockCall(
-            address(balanceClaimerProxy.erc20BalanceWithdrawer()),
+            address(balanceClaimerProxy.ERC20_BALANCE_WITHDRAWER()),
             abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector, _user, _erc20Claim),
             abi.encode(true)
         );
 
         vm.expectCall(
-            address(balanceClaimerProxy.erc20BalanceWithdrawer()),
+            address(balanceClaimerProxy.ERC20_BALANCE_WITHDRAWER()),
             abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector, _user, _erc20Claim)
         );
     }
@@ -182,13 +182,13 @@ contract BalanceClaimer_Test is BalanceClaimer_TestBase {
             return;
         }
         vm.mockCall(
-            address(balanceClaimerProxy.ethBalanceWithdrawer()),
+            address(balanceClaimerProxy.ETH_BALANCE_WITHDRAWER()),
             abi.encodeWithSelector(IEthBalanceWithdrawer.withdrawEthBalance.selector, _user, _ethBalance),
             abi.encode(true)
         );
 
         vm.expectCall(
-            address(balanceClaimerProxy.ethBalanceWithdrawer()),
+            address(balanceClaimerProxy.ETH_BALANCE_WITHDRAWER()),
             abi.encodeWithSelector(IEthBalanceWithdrawer.withdrawEthBalance.selector, _user, _ethBalance)
         );
     }

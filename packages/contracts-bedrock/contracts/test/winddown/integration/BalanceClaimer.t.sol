@@ -95,10 +95,10 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
         leaves = _getLeaves(_claimParams);
         tree = _mockRoot(leaves);
 
-        deal(token1, address(balanceClaimerProxy.erc20BalanceWithdrawer()), 600);
-        deal(token2, address(balanceClaimerProxy.erc20BalanceWithdrawer()), 600);
-        deal(token3, address(balanceClaimerProxy.erc20BalanceWithdrawer()), 900);
-        vm.deal(address(balanceClaimerProxy.ethBalanceWithdrawer()), 600);
+        deal(token1, address(balanceClaimerProxy.ERC20_BALANCE_WITHDRAWER()), 600);
+        deal(token2, address(balanceClaimerProxy.ERC20_BALANCE_WITHDRAWER()), 600);
+        deal(token3, address(balanceClaimerProxy.ERC20_BALANCE_WITHDRAWER()), 900);
+        vm.deal(address(balanceClaimerProxy.ETH_BALANCE_WITHDRAWER()), 600);
     }
 
     /// @dev Get the leaves for the merkle tree
@@ -155,10 +155,10 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
         );
 
         // Assertions
-        assertEq(address(balanceClaimerProxy.ethBalanceWithdrawer()).balance, 0);
-        assertEq(ERC20(token1).balanceOf(address(balanceClaimerProxy.erc20BalanceWithdrawer())), 0);
-        assertEq(ERC20(token2).balanceOf(address(balanceClaimerProxy.erc20BalanceWithdrawer())), 0);
-        assertEq(ERC20(token3).balanceOf(address(balanceClaimerProxy.erc20BalanceWithdrawer())), 0);
+        assertEq(address(balanceClaimerProxy.ETH_BALANCE_WITHDRAWER()).balance, 0);
+        assertEq(ERC20(token1).balanceOf(address(balanceClaimerProxy.ERC20_BALANCE_WITHDRAWER())), 0);
+        assertEq(ERC20(token2).balanceOf(address(balanceClaimerProxy.ERC20_BALANCE_WITHDRAWER())), 0);
+        assertEq(ERC20(token3).balanceOf(address(balanceClaimerProxy.ERC20_BALANCE_WITHDRAWER())), 0);
 
         assertEq(aliceClaimer.balance, aliceClaimParams.ethBalance);
         assertEq(ERC20(token2).balanceOf(aliceClaimer), aliceClaimParams.erc20TokenBalances[0].balance);

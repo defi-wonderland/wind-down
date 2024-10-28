@@ -16,13 +16,13 @@ import { Semver } from "../../universal/Semver.sol";
  */
 contract BalanceClaimer is Semver, IBalanceClaimer {
     /// @inheritdoc IBalanceClaimer
-    bytes32 public immutable root;
+    bytes32 public immutable ROOT;
 
     /// @inheritdoc IBalanceClaimer
-    IEthBalanceWithdrawer public immutable ethBalanceWithdrawer;
+    IEthBalanceWithdrawer public immutable ETH_BALANCE_WITHDRAWER;
 
     /// @inheritdoc IBalanceClaimer
-    IErc20BalanceWithdrawer public immutable erc20BalanceWithdrawer;
+    IErc20BalanceWithdrawer public immutable ERC20_BALANCE_WITHDRAWER;
 
     /// @inheritdoc IBalanceClaimer
     mapping(address => bool) public claimed;
@@ -35,9 +35,9 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
      */
     constructor(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root) Semver(1, 0, 0) {
         if (_root == 0) revert InvalidMerkleRoot();
-        ethBalanceWithdrawer = IEthBalanceWithdrawer(_ethBalanceWithdrawer);
-        erc20BalanceWithdrawer = IErc20BalanceWithdrawer(_erc20BalanceWithdrawer);
-        root = _root;
+        ETH_BALANCE_WITHDRAWER = IEthBalanceWithdrawer(_ethBalanceWithdrawer);
+        ERC20_BALANCE_WITHDRAWER = IErc20BalanceWithdrawer(_erc20BalanceWithdrawer);
+        ROOT = _root;
     }
 
     /// @inheritdoc IBalanceClaimer
@@ -51,11 +51,11 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
         claimed[_user] = true;
 
         if (_erc20Claim.length != 0) {
-            erc20BalanceWithdrawer.withdrawErc20Balance(_user, _erc20Claim);
+            ERC20_BALANCE_WITHDRAWER.withdrawErc20Balance(_user, _erc20Claim);
         }
 
         if (_ethBalance != 0) {
-            ethBalanceWithdrawer.withdrawEthBalance(_user, _ethBalance);
+            ETH_BALANCE_WITHDRAWER.withdrawEthBalance(_user, _ethBalance);
         }
 
         emit BalanceClaimed({user: _user, ethBalance: _ethBalance, erc20TokenBalances: _erc20Claim});
@@ -72,6 +72,6 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
 
         bytes32 _leaf = keccak256(bytes.concat(keccak256(abi.encode(_user, _ethBalance, _erc20Claim))));
 
-        _canClaimTokens = MerkleProof.verify(_proof, root, _leaf);
+        _canClaimTokens = MerkleProof.verify(_proof, ROOT, _leaf);
     }
 }

@@ -45,9 +45,9 @@ contract WinddownUpgrade is Script {
         balanceClaimerProxy.upgradeTo(address(balanceClaimerImpl));
 
         // BalanceClaimer assertions
-        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ethBalanceWithdrawer()) == address(optimismPortalProxy));
-        assert(address(BalanceClaimer(address(balanceClaimerProxy)).erc20BalanceWithdrawer()) == address(l1StandardBridgeProxy));
-        assert(BalanceClaimer(address(balanceClaimerProxy)).root() == WinddownConstants.MERKLE_ROOT);
+        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ETH_BALANCE_WITHDRAWER()) == address(optimismPortalProxy));
+        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ERC20_BALANCE_WITHDRAWER()) == address(l1StandardBridgeProxy));
+        assert(BalanceClaimer(address(balanceClaimerProxy)).ROOT() == WinddownConstants.MERKLE_ROOT);
 
         vm.stopBroadcast();
 
