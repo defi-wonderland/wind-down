@@ -14,7 +14,6 @@
 | 4   | an invalid claim should not be redeemable                                           | State transition | [x]     |
 | 5   | for each token, token.balanceOf(L1StandardBridge) == initialBalance - sum of claims | High-level       | [x]     |
 | 6   | OptimismPortal.balance == initialBalance - sum of claims                            | High-level       | [x]     |
-| 7   | balanceClaimer should only be initialized once                                      | Valid state       | [x]     |
 
 
 ## testing methodology

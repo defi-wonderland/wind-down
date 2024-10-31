@@ -35,18 +35,11 @@ contract BalanceClaimerSetup is CommonBase, StdUtils, Claims {
         L1ChugSplashProxy l1StandardBridgeProxy = new L1ChugSplashProxy(address(this));
         Proxy optimismPortalProxy = new Proxy(address(this));
 
-        BalanceClaimer balanceClaimerImpl = new BalanceClaimer();
+        BalanceClaimer balanceClaimerImpl =
+            new BalanceClaimer(address(optimismPortalProxy), address(l1StandardBridgeProxy), tree[0]);
 
         // Set BalanceClaimer implementation
-        balanceClaimerProxy.upgradeToAndCall(
-            address(balanceClaimerImpl),
-            abi.encodeWithSelector(
-                balanceClaimerImpl.initialize.selector,
-                address(optimismPortalProxy),
-                address(l1StandardBridgeProxy),
-                tree[0]
-            )
-        );
+        balanceClaimerProxy.upgradeTo(address(balanceClaimerImpl));
         optimismPortalProxy.upgradeTo(address(optimismPortalImpl));
         l1StandardBridgeProxy.setCode(address(l1StandardBridgeImpl).code);
 
@@ -65,9 +58,9 @@ contract BalanceClaimerSetup is CommonBase, StdUtils, Claims {
     /// @custom:prop sanity checks for setup
     function property_setup() external {
         assert(address(optimismPortal.BALANCE_CLAIMER()) == address(balanceClaimer));
-        assert(address(balanceClaimer.ethBalanceWithdrawer()) == address(optimismPortal));
-        assert(address(balanceClaimer.erc20BalanceWithdrawer()) == address(l1StandardBridge));
+        assert(address(balanceClaimer.ETH_BALANCE_WITHDRAWER()) == address(optimismPortal));
+        assert(address(balanceClaimer.ERC20_BALANCE_WITHDRAWER()) == address(l1StandardBridge));
         assert(address(l1StandardBridge.BALANCE_CLAIMER()) == address(balanceClaimer));
-        assert(balanceClaimer.root() == tree[0]);
+        assert(balanceClaimer.ROOT() == tree[0]);
     }
 }

@@ -6,15 +6,6 @@ import {IErc20BalanceWithdrawer} from "contracts/L1/interfaces/winddown/IErc20Ba
 import {IBalanceClaimer} from "contracts/L1/interfaces/winddown/IBalanceClaimer.sol";
 
 contract BalanceClaimerUnguidedHandlers is BalanceClaimerSetup {
-    function handler_initialize(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root)
-        external
-    {
-        // prop-id 7
-        try balanceClaimer.initialize(_ethBalanceWithdrawer, _erc20BalanceWithdrawer, _root) {
-            assert(false); // balanceClaimer should only be initialized once
-        } catch {}
-    }
-
     function handler_claim(
         bytes32[] calldata _proof,
         address _user,
@@ -28,7 +19,7 @@ contract BalanceClaimerUnguidedHandlers is BalanceClaimerSetup {
             //prop-id 1
             assert(ghost_claimInTree[hash]);
             //prop-id 2;
-            assert(!ghost_claimed[_user])
+            assert(!ghost_claimed[_user]);
             ghost_claimed[_user]=true;
         } catch {
             assert(
