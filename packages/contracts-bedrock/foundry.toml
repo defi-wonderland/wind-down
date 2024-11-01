@@ -24,6 +24,11 @@ fs_permissions = [
   { 'access'='read-write', 'path'='./.resource-metering.csv' },
 ]
 
+[profile.medusa]
+src='contracts/test/invariants/balance-claimer'
+test='contracts/test/invariants/balance-claimer'
+script='contracts/test/invariants/balance-claimer'
+
 [profile.ci]
 fuzz_runs = 512
 

@@ -742,7 +742,7 @@ contract L1StandardBridge_WithdrawErc20Balance_Test is Bridge_Initializer {
     {
         uint8 _claimArraySize;
         for (uint256 _i; _i < _fuzzBalances.length; _i++) {
-            assumeNoPrecompiles(_fuzzBalances[_i].token);
+            assumeNotPrecompile(_fuzzBalances[_i].token);
             if (_fuzzBalances[_i].balance > 0) {
                 _claimArraySize++;
                 vm.mockCall(
