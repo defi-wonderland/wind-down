@@ -14,5 +14,5 @@ library WinddownConstants {
     address constant MESSENGER = 0x97BAf688E5d0465E149d1d5B497Ca99392a6760e;
 
     // TODO: Set the correct merkle root
-    bytes32 constant MERKLE_ROOT = 0;
+    bytes32 constant MERKLE_ROOT;
 }
