@@ -5,7 +5,6 @@ import { console } from "forge-std/console.sol";
 import { Script } from "forge-std/Script.sol";
 
 import { Proxy } from "contracts/universal/Proxy.sol";
-import { L1ChugSplashProxy } from "contracts/legacy/L1ChugSplashProxy.sol";
 import { WinddownConstants } from "../WinddownConstants.sol";
 
 import { IBalanceClaimer, BalanceClaimer } from "contracts/L1/winddown/BalanceClaimer.sol";
@@ -15,15 +14,12 @@ import { OptimismPortal } from "contracts/L1/OptimismPortal.sol";
 import { L2OutputOracle } from "../../../contracts/L1/L2OutputOracle.sol";
 import { SystemConfig } from "../../../contracts/L1/SystemConfig.sol";
 
-contract WinddownUpgrade is Script {
+contract WinddownImplementationDeploy is Script {
     function run() public {
-        uint256 _deployerPk = vm.envUint("PRIVATE_KEY_PROXY_ADMIN");
+        uint256 _deployerPk = vm.envUint("PRIVATE_KEY_DEPLOYER");
         address _deployer = vm.addr(_deployerPk);
-
-        // Get the proxies for L1StandardBridge and OptimismPortal
-        L1ChugSplashProxy l1StandardBridgeProxy = L1ChugSplashProxy(payable(address(WinddownConstants.L1_STANDARD_BRIDGE_PROXY)));
-        Proxy optimismPortalProxy = Proxy(payable(address(WinddownConstants.OPTIMISM_PORTAL_PROXY)));
-
+        address _balanceClaimerProxyAdmin = vm.envAddress("BALANCE_CLAIMER_PROXY_ADMIN_PUBLIC_ADDRESS");
+    
         vm.startBroadcast(_deployer);
 
         // Deploy BalanceClaimer proxy
@@ -31,17 +27,20 @@ contract WinddownUpgrade is Script {
 
         // Deploy BalanceClaimer implementation
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer({
-            _ethBalanceWithdrawer: address(optimismPortalProxy),
-            _erc20BalanceWithdrawer: address(l1StandardBridgeProxy),
+            _ethBalanceWithdrawer: WinddownConstants.OPTIMISM_PORTAL_PROXY,
+            _erc20BalanceWithdrawer: WinddownConstants.L1_STANDARD_BRIDGE_PROXY,
             _root: WinddownConstants.MERKLE_ROOT
         });
 
          // Set BalanceClaimer implementation
         balanceClaimerProxy.upgradeTo(address(balanceClaimerImpl));
 
+        // Change the admin of the BalanceClaimer proxy
+        balanceClaimerProxy.changeAdmin(_balanceClaimerProxyAdmin);
+
         // BalanceClaimer assertions
-        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ETH_BALANCE_WITHDRAWER()) == address(optimismPortalProxy));
-        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ERC20_BALANCE_WITHDRAWER()) == address(l1StandardBridgeProxy));
+        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ETH_BALANCE_WITHDRAWER()) == WinddownConstants.OPTIMISM_PORTAL_PROXY);
+        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ERC20_BALANCE_WITHDRAWER()) == WinddownConstants.L1_STANDARD_BRIDGE_PROXY);
         assert(BalanceClaimer(address(balanceClaimerProxy)).ROOT() == WinddownConstants.MERKLE_ROOT);
 
         // Deploy OptimismPortal implementation
@@ -53,16 +52,11 @@ contract WinddownUpgrade is Script {
             _balanceClaimer: address(balanceClaimerProxy)
         });
 
-        // Upgrade OptimismPortal
-        optimismPortalProxy.upgradeTo(
-            address(opPortalImpl)
-        );
-
         // OptimismPortal assertions
-        assert(address(OptimismPortal(payable(address(optimismPortalProxy))).L2_ORACLE()) == WinddownConstants.L2_ORACLE);
-        assert(address(OptimismPortal(payable(address(optimismPortalProxy))).GUARDIAN()) == WinddownConstants.GUARDIAN);
-        assert(address(OptimismPortal(payable(address(optimismPortalProxy))).SYSTEM_CONFIG()) == WinddownConstants.SYSTEM_CONFIG);
-        assert(address(OptimismPortal(payable(address(optimismPortalProxy))).BALANCE_CLAIMER()) == address(balanceClaimerProxy));
+        assert(address(OptimismPortal(payable(address(opPortalImpl))).L2_ORACLE()) == WinddownConstants.L2_ORACLE);
+        assert(address(OptimismPortal(payable(address(opPortalImpl))).GUARDIAN()) == WinddownConstants.GUARDIAN);
+        assert(address(OptimismPortal(payable(address(opPortalImpl))).SYSTEM_CONFIG()) == WinddownConstants.SYSTEM_CONFIG);
+        assert(address(OptimismPortal(payable(address(opPortalImpl))).BALANCE_CLAIMER()) == address(balanceClaimerProxy));
         // No assertion for pause since it's set in the initializer and setting true or false in the new implementation constructor parameter is idempotent
 
         // Deploy L1StandardBridge implementation
@@ -71,12 +65,14 @@ contract WinddownUpgrade is Script {
             _balanceClaimer: address(balanceClaimerProxy)
         });
 
-        // Upgrade L1StandardBridge
-        l1StandardBridgeProxy.setCode(address(l1StandardBridgeImpl).code);
-
         // L1StandardBridge assertions
-        assert(address(L1StandardBridge(payable(address(l1StandardBridgeProxy))).BALANCE_CLAIMER()) == address(balanceClaimerProxy));
-        assert(address(L1StandardBridge(payable(address(l1StandardBridgeProxy))).MESSENGER()) == WinddownConstants.MESSENGER);
+        assert(address(L1StandardBridge(payable(address(l1StandardBridgeImpl))).BALANCE_CLAIMER()) == address(balanceClaimerProxy));
+        assert(address(L1StandardBridge(payable(address(l1StandardBridgeImpl))).MESSENGER()) == WinddownConstants.MESSENGER);
+
+        console.log("BalanceClaimer proxy deployed at: ", address(balanceClaimerProxy));
+        console.log("BalanceClaimer implementatoin deployed at: ", address(balanceClaimerImpl));
+        console.log("OptimismPortal implementation deployed at: ", address(opPortalImpl));
+        console.log("L1StandardBridge implementation deployed at: ", address(l1StandardBridgeImpl));
 
         vm.stopBroadcast();
     }
