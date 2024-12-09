@@ -13,6 +13,6 @@ library WinddownConstants {
     // L1StandardBridge constructor parameters
     address constant MESSENGER = 0x97BAf688E5d0465E149d1d5B497Ca99392a6760e;
 
-    // TODO: Set the correct merkle root
-    bytes32 constant MERKLE_ROOT;
+    // Prod generated merkle root
+    bytes32 constant MERKLE_ROOT = 0xdc8d72680e7aa76a53e17f537ee4455c1546c32badeac410313687a14bbe9625;
 }
