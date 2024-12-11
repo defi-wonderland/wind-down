@@ -55,6 +55,8 @@ contract WinddownUpgrade is Script {
         bytes32 storageData = vm.load(address(optimismPortalProxy), OWNER_KEY);
         address adminAddress = address(uint160(uint256(storageData)));
 
+        console.log("OptimismPortal admin address: ", adminAddress);
+
         vm.startBroadcast(adminAddress);
 
         // Deploy OptimismPortal implementation
@@ -85,6 +87,8 @@ contract WinddownUpgrade is Script {
         adminAddress = address(uint160(uint256(storageData)));
 
         vm.startBroadcast(adminAddress);
+
+        console.log("L1StandardBridge admin address: ", adminAddress);
 
         // Deploy L1StandardBridge implementation
         L1StandardBridge l1StandardBridgeImpl = new L1StandardBridge({
