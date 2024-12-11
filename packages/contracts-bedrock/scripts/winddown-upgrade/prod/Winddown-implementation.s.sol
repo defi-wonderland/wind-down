@@ -19,7 +19,7 @@ contract WinddownImplementationDeploy is Script {
         uint256 _deployerPk = vm.envUint("PRIVATE_KEY_DEPLOYER");
         address _deployer = vm.addr(_deployerPk);
         address _balanceClaimerProxyAdmin = vm.envAddress("BALANCE_CLAIMER_PROXY_ADMIN_PUBLIC_ADDRESS");
-    
+
         vm.startBroadcast(_deployer);
 
         // Deploy BalanceClaimer proxy
@@ -38,11 +38,6 @@ contract WinddownImplementationDeploy is Script {
         // Change the admin of the BalanceClaimer proxy
         balanceClaimerProxy.changeAdmin(_balanceClaimerProxyAdmin);
 
-        // BalanceClaimer assertions
-        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ETH_BALANCE_WITHDRAWER()) == WinddownConstants.OPTIMISM_PORTAL_PROXY);
-        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ERC20_BALANCE_WITHDRAWER()) == WinddownConstants.L1_STANDARD_BRIDGE_PROXY);
-        assert(BalanceClaimer(address(balanceClaimerProxy)).ROOT() == WinddownConstants.MERKLE_ROOT);
-
         // Deploy OptimismPortal implementation
         OptimismPortal opPortalImpl = new OptimismPortal({
             _l2Oracle: L2OutputOracle(WinddownConstants.L2_ORACLE),
@@ -52,18 +47,26 @@ contract WinddownImplementationDeploy is Script {
             _balanceClaimer: address(balanceClaimerProxy)
         });
 
-        // OptimismPortal assertions
-        assert(address(OptimismPortal(payable(address(opPortalImpl))).L2_ORACLE()) == WinddownConstants.L2_ORACLE);
-        assert(address(OptimismPortal(payable(address(opPortalImpl))).GUARDIAN()) == WinddownConstants.GUARDIAN);
-        assert(address(OptimismPortal(payable(address(opPortalImpl))).SYSTEM_CONFIG()) == WinddownConstants.SYSTEM_CONFIG);
-        assert(address(OptimismPortal(payable(address(opPortalImpl))).BALANCE_CLAIMER()) == address(balanceClaimerProxy));
-        // No assertion for pause since it's set in the initializer and setting true or false in the new implementation constructor parameter is idempotent
 
         // Deploy L1StandardBridge implementation
         L1StandardBridge l1StandardBridgeImpl = new L1StandardBridge({
             _messenger: payable(WinddownConstants.MESSENGER),
             _balanceClaimer: address(balanceClaimerProxy)
         });
+
+        vm.stopBroadcast();
+
+        // BalanceClaimer assertions
+        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ETH_BALANCE_WITHDRAWER()) == WinddownConstants.OPTIMISM_PORTAL_PROXY);
+        assert(address(BalanceClaimer(address(balanceClaimerProxy)).ERC20_BALANCE_WITHDRAWER()) == WinddownConstants.L1_STANDARD_BRIDGE_PROXY);
+        assert(BalanceClaimer(address(balanceClaimerProxy)).ROOT() == WinddownConstants.MERKLE_ROOT);
+
+        // OptimismPortal assertions
+        assert(address(OptimismPortal(payable(address(opPortalImpl))).L2_ORACLE()) == WinddownConstants.L2_ORACLE);
+        assert(address(OptimismPortal(payable(address(opPortalImpl))).GUARDIAN()) == WinddownConstants.GUARDIAN);
+        assert(address(OptimismPortal(payable(address(opPortalImpl))).SYSTEM_CONFIG()) == WinddownConstants.SYSTEM_CONFIG);
+        assert(address(OptimismPortal(payable(address(opPortalImpl))).BALANCE_CLAIMER()) == address(balanceClaimerProxy));
+        // No assertion for pause since it's set in the initializer and setting true or false in the new implementation constructor parameter is idempotent
 
         // L1StandardBridge assertions
         assert(address(L1StandardBridge(payable(address(l1StandardBridgeImpl))).BALANCE_CLAIMER()) == address(balanceClaimerProxy));
@@ -73,7 +76,5 @@ contract WinddownImplementationDeploy is Script {
         console.log("BalanceClaimer implementatoin deployed at: ", address(balanceClaimerImpl));
         console.log("OptimismPortal implementation deployed at: ", address(opPortalImpl));
         console.log("L1StandardBridge implementation deployed at: ", address(l1StandardBridgeImpl));
-
-        vm.stopBroadcast();
     }
 }
