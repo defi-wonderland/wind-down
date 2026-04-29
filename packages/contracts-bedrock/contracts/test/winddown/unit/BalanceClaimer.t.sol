@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 // libraries
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Testing
 import { stdStorage, StdStorage } from "forge-std/Test.sol";
@@ -304,5 +305,131 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
             vm.expectRevert(IBalanceClaimer.NoBalanceToClaim.selector);
             balanceClaimerProxy.claim(_proof, _users[_i], _claimData[_i].ethBalance, _erc20Claim);
         }
+    }
+}
+
+contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
+    event Clawback(address indexed foundation, address indexed timelock);
+
+    address constant FOUNDATION = address(0);
+    address constant TIMELOCK = address(0);
+    address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    address constant GTC = 0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F;
+
+    /// @dev Mock the four `balanceOf(bridge)` calls that {clawback} reads.
+    function _mockTokenBalances(uint256 _dai, uint256 _usdc, uint256 _usdt, uint256 _gtc) internal {
+        vm.mockCall(
+            DAI,
+            abi.encodeWithSelector(IERC20.balanceOf.selector, address(mockL1StandardBridge)),
+            abi.encode(_dai)
+        );
+        vm.mockCall(
+            USDC,
+            abi.encodeWithSelector(IERC20.balanceOf.selector, address(mockL1StandardBridge)),
+            abi.encode(_usdc)
+        );
+        vm.mockCall(
+            USDT,
+            abi.encodeWithSelector(IERC20.balanceOf.selector, address(mockL1StandardBridge)),
+            abi.encode(_usdt)
+        );
+        vm.mockCall(
+            GTC,
+            abi.encodeWithSelector(IERC20.balanceOf.selector, address(mockL1StandardBridge)),
+            abi.encode(_gtc)
+        );
+    }
+
+    /// @dev Build the four-token claim array as {clawback} composes it.
+    function _claims(uint256 _dai, uint256 _usdc, uint256 _usdt, uint256 _gtc)
+        internal
+        pure
+        returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _out)
+    {
+        _out = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](4);
+        _out[0] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: DAI, balance: _dai });
+        _out[1] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDC, balance: _usdc });
+        _out[2] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDT, balance: _usdt });
+        _out[3] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: GTC, balance: _gtc });
+    }
+
+    /// @dev Mock and expect `withdrawErc20Balance(_user, _claims)` against the bridge.
+    function _expectErc20Withdraw(address _user, IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _claim)
+        internal
+    {
+        bytes memory _data =
+            abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector, _user, _claim);
+        vm.mockCall(mockL1StandardBridge, _data, abi.encode(true));
+        vm.expectCall(mockL1StandardBridge, _data);
+    }
+
+    /// @dev Mock and expect `withdrawEthBalance(_user, _amount)` against the portal.
+    function _expectEthWithdraw(address _user, uint256 _amount) internal {
+        bytes memory _data =
+            abi.encodeWithSelector(IEthBalanceWithdrawer.withdrawEthBalance.selector, _user, _amount);
+        vm.mockCall(mockOptimismPortal, _data, abi.encode(true));
+        vm.expectCall(mockOptimismPortal, _data);
+    }
+
+    /// @dev FOUNDATION receives `bal/2`, TIMELOCK receives `bal - bal/2` (so any odd-unit
+    ///      remainder goes to TIMELOCK). The ETH withdrawer is invoked only when its balance
+    ///      is non-zero. This single fuzz subsumes the even/odd/zero-eth/all-zero cases.
+    ///      `uint128` keeps `vm.deal` within the available test ETH budget.
+    function testFuzz_clawback_splitsBalances(
+        uint128 _eth,
+        uint128 _dai,
+        uint128 _usdc,
+        uint128 _usdt,
+        uint128 _gtc
+    )
+        external
+    {
+        vm.deal(mockOptimismPortal, _eth);
+        _mockTokenBalances(_dai, _usdc, _usdt, _gtc);
+
+        if (_eth != 0) {
+            _expectEthWithdraw(FOUNDATION, _eth / 2);
+            _expectEthWithdraw(TIMELOCK, _eth - _eth / 2);
+        } else {
+            vm.expectCall(
+                mockOptimismPortal,
+                abi.encodeWithSelector(IEthBalanceWithdrawer.withdrawEthBalance.selector),
+                0
+            );
+        }
+
+        _expectErc20Withdraw(
+            FOUNDATION, _claims(uint256(_dai) / 2, uint256(_usdc) / 2, uint256(_usdt) / 2, uint256(_gtc) / 2)
+        );
+        _expectErc20Withdraw(
+            TIMELOCK,
+            _claims(
+                uint256(_dai) - uint256(_dai) / 2,
+                uint256(_usdc) - uint256(_usdc) / 2,
+                uint256(_usdt) - uint256(_usdt) / 2,
+                uint256(_gtc) - uint256(_gtc) / 2
+            )
+        );
+
+        vm.expectEmit(address(balanceClaimerProxy));
+        emit Clawback(FOUNDATION, TIMELOCK);
+
+        BalanceClaimer(address(balanceClaimerProxy)).clawback();
+    }
+
+    /// @dev Permissionless: any caller can trigger the drain.
+    function testFuzz_clawback_permissionless(address _caller) external {
+        vm.deal(mockOptimismPortal, 100);
+        _mockTokenBalances(0, 0, 0, 0);
+
+        _expectEthWithdraw(FOUNDATION, 50);
+        _expectEthWithdraw(TIMELOCK, 50);
+        _expectErc20Withdraw(FOUNDATION, _claims(0, 0, 0, 0));
+        _expectErc20Withdraw(TIMELOCK, _claims(0, 0, 0, 0));
+
+        vm.prank(_caller);
+        BalanceClaimer(address(balanceClaimerProxy)).clawback();
     }
 }
