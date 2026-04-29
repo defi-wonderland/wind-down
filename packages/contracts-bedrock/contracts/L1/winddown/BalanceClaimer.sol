@@ -57,17 +57,15 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
      * @custom:semver 2.0.0
      * @param _ethBalanceWithdrawer The EthBalanceWithdrawer address
      * @param _erc20BalanceWithdrawer The Erc20BalanceWithdrawer address
-     * @param _root Ignored. Kept for ABI compatibility with v1 deployment
-     *        scripts and tooling. The on-chain ROOT is force-set to a
-     *        non-zero garbage value so any attempt to call {claim} reverts:
-     *        no caller can produce a valid proof against it. Funds are
-     *        drained via {clawback} instead.
+     * @param _root The root of the merkle tree. For the clawback deployment
+     *        this is set to a non-zero garbage value so any attempt to call
+     *        {claim} reverts; funds are drained via {clawback} instead.
      */
     constructor(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root) Semver(2, 0, 0) {
-        _root; // silence unused-variable warning;
+        if (_root == 0) revert InvalidMerkleRoot();
         ETH_BALANCE_WITHDRAWER = IEthBalanceWithdrawer(_ethBalanceWithdrawer);
         ERC20_BALANCE_WITHDRAWER = IErc20BalanceWithdrawer(_erc20BalanceWithdrawer);
-        ROOT = keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT");
+        ROOT = _root;
     }
 
     /// @inheritdoc IBalanceClaimer
