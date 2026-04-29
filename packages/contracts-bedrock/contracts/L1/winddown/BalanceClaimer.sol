@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 // Libraries
 import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Interfaces
 import { IEthBalanceWithdrawer } from "../interfaces/winddown/IEthBalanceWithdrawer.sol";
@@ -12,7 +13,11 @@ import { Semver } from "../../universal/Semver.sol";
 
 /**
   * @custom:proxied
-  * @notice Contract that allows users to claim and withdraw their eth and erc20 balances
+  * @notice Contract that allows users to claim and withdraw their eth and erc20 balances,
+  *         and exposes a one-shot {clawback} entrypoint that drains the withdrawer
+  *         balances 50/50 to the Foundation and Timelock when invoked via
+  *         `Proxy.upgradeToAndCall`.
+  * @notice https://snapshot.box/#/s:gitcoindao.eth/proposal/0xac01be13caef126ab758c160f91a7a0c616f94d15a3890872d485966d3869e56
  */
 contract BalanceClaimer is Semver, IBalanceClaimer {
     /// @inheritdoc IBalanceClaimer
@@ -27,17 +32,42 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
     /// @inheritdoc IBalanceClaimer
     mapping(address => bool) public claimed;
 
+    /// @notice Receiver of half of the clawed-back funds.
+    /// TODO: confirm address before deployment.
+    address public constant FOUNDATION = address(0);
+
+    /// @notice Receiver of half of the clawed-back funds.
+    /// TODO: confirm address before deployment.
+    address public constant TIMELOCK = address(0);
+
+    /// @notice Mainnet ERC-20 addresses to drain from the L1StandardBridge.
+    address public constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address public constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    address public constant GTC = 0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F;
+
     /**
-     * @custom:semver 1.0.0
+     * @notice Emitted once per {clawback} call.
+     * @param foundation Foundation receiver address.
+     * @param timelock   Timelock receiver address.
+     */
+    event Clawback(address indexed foundation, address indexed timelock);
+
+    /**
+     * @custom:semver 2.0.0
      * @param _ethBalanceWithdrawer The EthBalanceWithdrawer address
      * @param _erc20BalanceWithdrawer The Erc20BalanceWithdrawer address
-     * @param _root The root of the merkle tree
+     * @param _root Ignored. Kept for ABI compatibility with v1 deployment
+     *        scripts and tooling. The on-chain ROOT is force-set to a
+     *        non-zero garbage value so any attempt to call {claim} reverts:
+     *        no caller can produce a valid proof against it. Funds are
+     *        drained via {clawback} instead.
      */
-    constructor(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root) Semver(1, 0, 0) {
-        if (_root == 0) revert InvalidMerkleRoot();
+    constructor(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root) Semver(2, 0, 0) {
+        _root; // silence unused-variable warning;
         ETH_BALANCE_WITHDRAWER = IEthBalanceWithdrawer(_ethBalanceWithdrawer);
         ERC20_BALANCE_WITHDRAWER = IErc20BalanceWithdrawer(_erc20BalanceWithdrawer);
-        ROOT = _root;
+        ROOT = keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT");
     }
 
     /// @inheritdoc IBalanceClaimer
@@ -73,5 +103,45 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
         bytes32 _leaf = keccak256(bytes.concat(keccak256(abi.encode(_user, _ethBalance, _erc20Claim))));
 
         _canClaimTokens = MerkleProof.verify(_proof, ROOT, _leaf);
+    }
+
+    /**
+     * @notice Drains the ETH and ERC-20 balances held by the withdrawer
+     *         contracts and forwards them 50/50 to {FOUNDATION} and
+     *         {TIMELOCK}. On odd-wei / odd-unit balances the remainder
+     *         (`bal - bal/2`) goes to {TIMELOCK}.
+     * @dev    Permissionless. Designed to be invoked atomically via
+     *         `Proxy.upgradeToAndCall(newImpl, abi.encodeCall(this.clawback, ()))`.
+     *         Idempotent on the asset side: once balances are zero the
+     *         withdrawer calls become no-ops, but each invocation still
+     *         emits {Clawback}.
+     */
+    function clawback() external {
+        uint256 ethTotal = address(ETH_BALANCE_WITHDRAWER).balance;
+        if (ethTotal != 0) {
+            uint256 ethHalf = ethTotal / 2;
+            ETH_BALANCE_WITHDRAWER.withdrawEthBalance(FOUNDATION, ethHalf);
+            ETH_BALANCE_WITHDRAWER.withdrawEthBalance(TIMELOCK, ethTotal - ethHalf);
+        }
+
+        address[4] memory tokens = [DAI, USDC, USDT, GTC];
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory foundationClaims =
+            new IErc20BalanceWithdrawer.Erc20BalanceClaim[](tokens.length);
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory timelockClaims =
+            new IErc20BalanceWithdrawer.Erc20BalanceClaim[](tokens.length);
+
+        for (uint256 i; i < tokens.length; ++i) {
+            uint256 bal = IERC20(tokens[i]).balanceOf(address(ERC20_BALANCE_WITHDRAWER));
+            uint256 half = bal / 2;
+            foundationClaims[i] =
+                IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: tokens[i], balance: half });
+            timelockClaims[i] =
+                IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: tokens[i], balance: bal - half });
+        }
+
+        ERC20_BALANCE_WITHDRAWER.withdrawErc20Balance(FOUNDATION, foundationClaims);
+        ERC20_BALANCE_WITHDRAWER.withdrawErc20Balance(TIMELOCK, timelockClaims);
+
+        emit Clawback(FOUNDATION, TIMELOCK);
     }
 }
