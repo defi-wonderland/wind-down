@@ -16,6 +16,13 @@ import { OptimismPortal } from "contracts/L1/OptimismPortal.sol";
 import { L2OutputOracle } from "../../../contracts/L1/L2OutputOracle.sol";
 import { SystemConfig } from "../../../contracts/L1/SystemConfig.sol";
 
+/// @notice DEPRECATED — fork rehearsal for the original v1 winddown deploy.
+///         After the clawback work landed in {BalanceClaimer}, the impl this
+///         script deploys is now v2 (semver 2.0.0) and exposes `clawback()`
+///         alongside the real Merkle root. The two are incompatible by intent:
+///         the clawback path expects a garbage root and FOUNDATION/TIMELOCK
+///         receivers that are *not* `address(0)`. Do not use this script for
+///         the clawback rehearsal — see {local/Clawback.s.sol} instead.
 contract WinddownUpgrade is Script {
     bytes32 internal constant OWNER_KEY = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
