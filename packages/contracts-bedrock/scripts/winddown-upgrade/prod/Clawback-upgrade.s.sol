@@ -20,9 +20,12 @@ import { WinddownConstants } from "../WinddownConstants.sol";
 ///
 ///         The printed `target` and `calldata` are pasted into a Safe tx-builder.
 contract ClawbackUpgrade is Script {
-    function run(address _newImpl) public pure {
+    function run(address _newImpl) public view {
         require(WinddownConstants.BALANCE_CLAIMER_PROXY != address(0), "BALANCE_CLAIMER_PROXY unset in WinddownConstants");
         require(_newImpl != address(0), "newImpl is zero");
+        require(_newImpl.code.length > 0, "newImpl has no code");
+        require(BalanceClaimer(_newImpl).FOUNDATION() != address(0), "newImpl: FOUNDATION unset");
+        require(BalanceClaimer(_newImpl).TIMELOCK() != address(0), "newImpl: TIMELOCK unset");
 
         bytes memory _innerCall = abi.encodeCall(BalanceClaimer.clawback, ());
         bytes memory _outerCall =

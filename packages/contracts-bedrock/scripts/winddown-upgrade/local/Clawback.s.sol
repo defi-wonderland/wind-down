@@ -33,11 +33,16 @@ contract ClawbackUpgradeLocal is Script {
         BalanceClaimer newImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: WinddownConstants.OPTIMISM_PORTAL_PROXY,
             _erc20BalanceWithdrawer: WinddownConstants.L1_STANDARD_BRIDGE_PROXY,
-            _root: WinddownConstants.CLAWBACK_GARBAGE_ROOT
+            _root: WinddownConstants.CLAWBACK_GARBAGE_ROOT,
+            _foundation: WinddownConstants.FOUNDATION_RECEIVER,
+            _timelock: WinddownConstants.TIMELOCK_RECEIVER
         });
         vm.stopBroadcast();
 
         console.log("New BalanceClaimer (clawback) impl deployed at:", address(newImpl));
+
+        assert(newImpl.FOUNDATION() == WinddownConstants.FOUNDATION_RECEIVER);
+        assert(newImpl.TIMELOCK() == WinddownConstants.TIMELOCK_RECEIVER);
 
         // 2. Upgrade-and-call as the proxy admin. Tell the local anvil node to
         //    impersonate the admin (no private key on this machine) and fund it
