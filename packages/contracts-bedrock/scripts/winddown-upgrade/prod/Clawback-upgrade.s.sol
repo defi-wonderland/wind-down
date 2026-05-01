@@ -20,11 +20,6 @@ import { WinddownConstants } from "../WinddownConstants.sol";
 ///
 ///         The printed `target` and `calldata` are pasted into a Safe tx-builder.
 contract ClawbackUpgrade is Script {
-    /// @dev Mirrors `BalanceClaimer.FOUNDATION` so we can reject impls whose
-    ///      bytecode bakes in a different receiver. Keep in sync with
-    ///      `contracts/L1/winddown/BalanceClaimer.sol`.
-    address internal constant EXPECTED_FOUNDATION = 0x50ccf30828DdDA5aDFd25A3CEc24b83F13496774;
-
     function run(address _newImpl) public view {
         require(WinddownConstants.BALANCE_CLAIMER_PROXY != address(0), "BALANCE_CLAIMER_PROXY unset in WinddownConstants");
         require(_newImpl != address(0), "newImpl is zero");
@@ -40,7 +35,7 @@ contract ClawbackUpgrade is Script {
             address(_impl.ERC20_BALANCE_WITHDRAWER()) == WinddownConstants.L1_STANDARD_BRIDGE_PROXY,
             "newImpl: wrong ERC20_BALANCE_WITHDRAWER"
         );
-        require(_impl.FOUNDATION() == EXPECTED_FOUNDATION, "newImpl: wrong FOUNDATION");
+        require(_impl.FOUNDATION() == WinddownConstants.FOUNDATION, "newImpl: wrong FOUNDATION");
 
         bytes memory _innerCall = abi.encodeCall(BalanceClaimer.clawback, ());
         bytes memory _outerCall =

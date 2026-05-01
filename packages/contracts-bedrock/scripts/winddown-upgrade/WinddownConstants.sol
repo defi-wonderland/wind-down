@@ -23,4 +23,9 @@ library WinddownConstants {
     /// @dev Non-zero garbage Merkle root passed to the v2 BalanceClaimer impl so any
     ///      `claim` call reverts; funds move only via {BalanceClaimer.clawback}.
     bytes32 constant CLAWBACK_GARBAGE_ROOT = keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT");
+
+    /// @dev Mirrors `BalanceClaimer.FOUNDATION`. Used by deploy / upgrade scripts
+    ///      to reject impls whose bytecode bakes in a different receiver. Keep in
+    ///      sync with `contracts/L1/winddown/BalanceClaimer.sol`.
+    address constant FOUNDATION = 0x50ccf30828DdDA5aDFd25A3CEc24b83F13496774;
 }

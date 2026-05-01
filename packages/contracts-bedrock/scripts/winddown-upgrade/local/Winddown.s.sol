@@ -27,6 +27,10 @@ contract WinddownUpgrade is Script {
     bytes32 internal constant OWNER_KEY = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     function run() public {
+        revert(
+            "DEPRECATED: use scripts/winddown-upgrade/local/Clawback.s.sol for the clawback rehearsal"
+        );
+
         uint256 _deployerPk = vm.envUint("PRIVATE_KEY_PROXY_ADMIN");
         address _deployer = vm.addr(_deployerPk);
 

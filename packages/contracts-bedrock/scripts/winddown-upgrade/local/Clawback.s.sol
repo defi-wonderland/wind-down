@@ -40,7 +40,7 @@ contract ClawbackUpgradeLocal is Script {
 
         console.log("New BalanceClaimer (clawback) impl deployed at:", address(newImpl));
 
-        assert(newImpl.FOUNDATION() != address(0));
+        assert(newImpl.FOUNDATION() == WinddownConstants.FOUNDATION);
 
         // 2. Upgrade-and-call as the proxy admin. Tell the local anvil node to
         //    impersonate the admin (no private key on this machine) and fund it

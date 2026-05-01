@@ -26,6 +26,11 @@ import { SystemConfig } from "../../../contracts/L1/SystemConfig.sol";
 ///         {Clawback-upgrade.s.sol} for the governance calldata.
 contract WinddownImplementationDeploy is Script {
     function run() public {
+        revert(
+            "DEPRECATED: use Clawback-implementation.s.sol for the impl deploy "
+            "and Clawback-upgrade.s.sol for the governance calldata"
+        );
+
         uint256 _deployerPk = vm.envUint("PRIVATE_KEY_DEPLOYER");
         address _deployer = vm.addr(_deployerPk);
         address _balanceClaimerProxyAdmin = vm.envAddress("BALANCE_CLAIMER_PROXY_ADMIN_PUBLIC_ADDRESS");
