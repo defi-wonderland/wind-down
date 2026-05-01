@@ -6,7 +6,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Testing
-import { stdStorage, StdStorage } from "forge-std/Test.sol";
+import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
 import { Bridge_Initializer } from "../../CommonTest.t.sol";
 import { MerkleTreeGenerator } from "../../libraries/MerkleTreeGenerator.t.sol";
 
@@ -232,28 +232,7 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     }
 }
 
-/// @notice Minimal ERC20 used in the clawback integration tests. Mirrors
-///         OpenZeppelin's zero-address guard on transfer so the suite
-///         exercises the same revert path real DAI/USDC/USDT/GTC implement.
-///         Bytecode is `vm.etch`-ed at the hardcoded mainnet token addresses
-///         referenced by {clawback}.
-contract MockERC20 {
-    mapping(address => uint256) public balanceOf;
-
-    function mint(address _to, uint256 _amount) external {
-        require(_to != address(0), "ERC20: mint to the zero address");
-        balanceOf[_to] += _amount;
-    }
-
-    function transfer(address _to, uint256 _amount) external returns (bool) {
-        require(_to != address(0), "ERC20: transfer to the zero address");
-        balanceOf[msg.sender] -= _amount;
-        balanceOf[_to] += _amount;
-        return true;
-    }
-}
-
-contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
+contract BalanceClaimer_Clawback_Integration_Test is Test {
     event Clawback(
         address indexed foundation,
         uint256 ethTotal,
@@ -265,70 +244,97 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
     address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
     address constant GTC = 0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F;
 
-    uint256 constant SEED_DAI = 1000;
-    uint256 constant SEED_USDC = 2000;
-    uint256 constant SEED_USDT = 3001;
-    uint256 constant SEED_GTC = 4000;
-    uint256 constant SEED_ETH = 100 ether;
+    /// @dev Live mainnet contracts the test runs against on a forked chain.
+    address constant PORTAL = 0xb26Fd985c5959bBB382BAFdD0b879E149e48116c;
+    address constant BRIDGE = 0xD0204B9527C1bA7bD765Fa5CCD9355d38338272b;
+    address constant CLAIMER_PROXY = 0x0Ca4C7A370E0155c77a33e78443a54D749E0BC21;
 
-    address foundation;
+    /// @dev Mainnet block the fork is pinned to. Mainnet balances at this
+    ///      height are the source of truth for what `clawback` should drain.
+    uint256 constant FORK_BLOCK = 25002349;
+
+    /// @dev EIP-1967 admin slot.
+    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     BalanceClaimer clawbackImpl;
+    address foundation;
+    address proxyAdmin;
 
-    function setUp() public override {
-        super.setUp();
+    // Real bridge / portal balances at FORK_BLOCK; captured at setUp.
+    uint256 ethTotal;
+    uint256 daiTotal;
+    uint256 usdcTotal;
+    uint256 usdtTotal;
+    uint256 gtcTotal;
 
-        // Etch a strict ERC20 implementation at each hardcoded token address
-        // so calls to {balanceOf} and {transfer} resolve. The mock keeps OZ's
-        // zero-address guard intact, so any regression that pointed
-        // {clawback} at address(0) would still be caught.
-        bytes memory _code = address(new MockERC20()).code;
-        vm.etch(DAI, _code);
-        vm.etch(USDC, _code);
-        vm.etch(USDT, _code);
-        vm.etch(GTC, _code);
+    // Foundation pre-clawback balances; assertions use deltas instead of
+    // overwriting Foundation state, so the test runs on the real chain.
+    uint256 fndEth;
+    uint256 fndDai;
+    uint256 fndUsdc;
+    uint256 fndUsdt;
+    uint256 fndGtc;
 
-        // Seed the L1StandardBridge with token balances and the OptimismPortal with ETH.
-        MockERC20(DAI).mint(address(L1Bridge), SEED_DAI);
-        MockERC20(USDC).mint(address(L1Bridge), SEED_USDC);
-        MockERC20(USDT).mint(address(L1Bridge), SEED_USDT);
-        MockERC20(GTC).mint(address(L1Bridge), SEED_GTC);
-        vm.deal(address(op), SEED_ETH);
+    function setUp() public {
+        // Pin to a known mainnet block so the captured balances are stable.
+        vm.createSelectFork(vm.envString("ETHEREUM_MAINNET_RPC"), FORK_BLOCK);
 
-        // Deploy the new BalanceClaimer implementation. The Merkle root is a
-        // non-zero garbage value: claims become infeasible and only `clawback`
-        // can move funds.
+        // Deploy the new BalanceClaimer implementation wired to the live
+        // mainnet portal / bridge proxies. Garbage Merkle root neutralizes
+        // {claim}; only {clawback} can move funds.
         clawbackImpl = new BalanceClaimer({
-            _ethBalanceWithdrawer: address(op),
-            _erc20BalanceWithdrawer: address(L1Bridge),
+            _ethBalanceWithdrawer: PORTAL,
+            _erc20BalanceWithdrawer: BRIDGE,
             _root: keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT")
         });
 
         foundation = clawbackImpl.FOUNDATION();
+        proxyAdmin = address(uint160(uint256(vm.load(CLAIMER_PROXY, ADMIN_SLOT))));
+        vm.deal(proxyAdmin, 1 ether); // gas for the upgrade tx
+
+        ethTotal = PORTAL.balance;
+        daiTotal = IERC20(DAI).balanceOf(BRIDGE);
+        usdcTotal = IERC20(USDC).balanceOf(BRIDGE);
+        usdtTotal = IERC20(USDT).balanceOf(BRIDGE);
+        gtcTotal = IERC20(GTC).balanceOf(BRIDGE);
+
+        fndEth = foundation.balance;
+        fndDai = IERC20(DAI).balanceOf(foundation);
+        fndUsdc = IERC20(USDC).balanceOf(foundation);
+        fndUsdt = IERC20(USDT).balanceOf(foundation);
+        fndGtc = IERC20(GTC).balanceOf(foundation);
     }
 
-    /// @dev Build the seeded-token claim array (filtered like {clawback} does).
-    function _seedClaims() internal pure returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _out) {
-        _out = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](4);
-        _out[0] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: DAI, balance: SEED_DAI });
-        _out[1] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDC, balance: SEED_USDC });
-        _out[2] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDT, balance: SEED_USDT });
-        _out[3] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: GTC, balance: SEED_GTC });
+    /// @dev Build the same filtered claim array {clawback} composes from
+    ///      the real bridge balances at FORK_BLOCK.
+    function _expectedClaims() internal view returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _out) {
+        address[4] memory _tokens = [DAI, USDC, USDT, GTC];
+        uint256[4] memory _bals = [daiTotal, usdcTotal, usdtTotal, gtcTotal];
+        uint256 _nonZero;
+        for (uint256 i; i < 4; ++i) if (_bals[i] != 0) ++_nonZero;
+        _out = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](_nonZero);
+        uint256 _j;
+        for (uint256 i; i < 4; ++i) {
+            if (_bals[i] != 0) {
+                _out[_j++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: _tokens[i], balance: _bals[i] });
+            }
+        }
     }
 
-    /// @dev Asserts the bridge and portal are drained and FOUNDATION received the full totals.
+    /// @dev Asserts the bridge / portal are drained and FOUNDATION's deltas
+    ///      match the captured pre-clawback totals.
     function _assertDrained() internal view {
-        assertEq(address(op).balance, 0);
-        assertEq(IERC20(DAI).balanceOf(address(L1Bridge)), 0);
-        assertEq(IERC20(USDC).balanceOf(address(L1Bridge)), 0);
-        assertEq(IERC20(USDT).balanceOf(address(L1Bridge)), 0);
-        assertEq(IERC20(GTC).balanceOf(address(L1Bridge)), 0);
+        assertEq(PORTAL.balance, 0);
+        assertEq(IERC20(DAI).balanceOf(BRIDGE), 0);
+        assertEq(IERC20(USDC).balanceOf(BRIDGE), 0);
+        assertEq(IERC20(USDT).balanceOf(BRIDGE), 0);
+        assertEq(IERC20(GTC).balanceOf(BRIDGE), 0);
 
-        assertEq(foundation.balance, SEED_ETH);
-        assertEq(IERC20(DAI).balanceOf(foundation), SEED_DAI);
-        assertEq(IERC20(USDC).balanceOf(foundation), SEED_USDC);
-        assertEq(IERC20(USDT).balanceOf(foundation), SEED_USDT);
-        assertEq(IERC20(GTC).balanceOf(foundation), SEED_GTC);
+        assertEq(foundation.balance, fndEth + ethTotal);
+        assertEq(IERC20(DAI).balanceOf(foundation), fndDai + daiTotal);
+        assertEq(IERC20(USDC).balanceOf(foundation), fndUsdc + usdcTotal);
+        assertEq(IERC20(USDT).balanceOf(foundation), fndUsdt + usdtTotal);
+        assertEq(IERC20(GTC).balanceOf(foundation), fndGtc + gtcTotal);
     }
 
     /// @dev Atomic upgrade-and-drain: governance executes a single tx that swaps the impl and
@@ -336,25 +342,25 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
     function test_clawback_upgradeToAndCall_drainsAtomically() external {
         bytes memory _data = abi.encodeWithSelector(BalanceClaimer.clawback.selector);
 
-        vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(foundation, SEED_ETH, _seedClaims());
+        vm.expectEmit(CLAIMER_PROXY);
+        emit Clawback(foundation, ethTotal, _expectedClaims());
 
-        vm.prank(multisig);
-        Proxy(payable(address(balanceClaimerProxy))).upgradeToAndCall(address(clawbackImpl), _data);
+        vm.prank(proxyAdmin);
+        Proxy(payable(CLAIMER_PROXY)).upgradeToAndCall(address(clawbackImpl), _data);
 
         _assertDrained();
     }
 
     /// @dev Two-step: governance does a plain `upgradeTo`, then anyone calls `clawback()`.
     function test_clawback_upgradeTo_thenCallByAnyone_succeeds() external {
-        vm.prank(multisig);
-        Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(clawbackImpl));
+        vm.prank(proxyAdmin);
+        Proxy(payable(CLAIMER_PROXY)).upgradeTo(address(clawbackImpl));
 
-        vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(foundation, SEED_ETH, _seedClaims());
+        vm.expectEmit(CLAIMER_PROXY);
+        emit Clawback(foundation, ethTotal, _expectedClaims());
 
         vm.prank(makeAddr("anyone"));
-        BalanceClaimer(address(balanceClaimerProxy)).clawback();
+        BalanceClaimer(CLAIMER_PROXY).clawback();
 
         _assertDrained();
     }
@@ -363,29 +369,29 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
     ///      the event with zero ETH total and an empty erc20 totals array
     ///      (since clawback filters zero-balance tokens).
     function test_clawback_idempotent() external {
-        vm.prank(multisig);
-        Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(clawbackImpl));
+        vm.prank(proxyAdmin);
+        Proxy(payable(CLAIMER_PROXY)).upgradeTo(address(clawbackImpl));
 
-        BalanceClaimer(address(balanceClaimerProxy)).clawback();
+        BalanceClaimer(CLAIMER_PROXY).clawback();
         _assertDrained();
 
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _empty;
-        vm.expectEmit(address(balanceClaimerProxy));
+        vm.expectEmit(CLAIMER_PROXY);
         emit Clawback(foundation, 0, _empty);
-        BalanceClaimer(address(balanceClaimerProxy)).clawback();
+        BalanceClaimer(CLAIMER_PROXY).clawback();
 
         _assertDrained();
     }
 
     /// @dev Once upgraded, `claim()` is unreachable: the garbage root makes any proof invalid.
     function test_claim_revertsAfterClawbackUpgrade() external {
-        vm.prank(multisig);
-        Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(clawbackImpl));
+        vm.prank(proxyAdmin);
+        Proxy(payable(CLAIMER_PROXY)).upgradeTo(address(clawbackImpl));
 
         bytes32[] memory _emptyProof;
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _emptyClaim;
 
         vm.expectRevert(IBalanceClaimer.NoBalanceToClaim.selector);
-        balanceClaimerProxy.claim(_emptyProof, makeAddr("eve"), 0, _emptyClaim);
+        IBalanceClaimer(CLAIMER_PROXY).claim(_emptyProof, makeAddr("eve"), 0, _emptyClaim);
     }
 }
