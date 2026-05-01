@@ -427,12 +427,11 @@ contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
     }
 
-    /// @dev Permissionless: any caller can trigger the drain. The proxy admin
-    ///      is excluded because OP's transparent proxy reverts when admin
-    ///      calls a non-admin selector.
+    /// @dev Permissionless: any caller — including the proxy admin — can
+    ///      trigger the drain. OP's `Proxy.fallback` unconditionally
+    ///      delegates, so `clawback()` (a non-admin selector) routes to the
+    ///      impl regardless of `msg.sender`.
     function testFuzz_clawback_permissionless(address _caller) external {
-        vm.assume(_caller != multisig);
-
         vm.deal(mockOptimismPortal, 100);
         _mockTokenBalances(0, 0, 0, 0);
 
