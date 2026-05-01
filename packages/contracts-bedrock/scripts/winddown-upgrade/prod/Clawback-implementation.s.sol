@@ -14,8 +14,9 @@ import { WinddownConstants } from "../WinddownConstants.sol";
 contract ClawbackImplementationDeploy is Script {
     function run() public {
         uint256 _deployerPk = vm.envUint("PRIVATE_KEY_DEPLOYER");
-        address _deployer = vm.addr(_deployerPk);
-        vm.startBroadcast(_deployer);
+        // Sign locally with the loaded private key so the script doesn't
+        // depend on the RPC having an unlocked account.
+        vm.startBroadcast(_deployerPk);
 
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: WinddownConstants.OPTIMISM_PORTAL_PROXY,

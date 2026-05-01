@@ -26,10 +26,11 @@ contract ClawbackUpgradeLocal is Script {
         Proxy balanceClaimerProxy = Proxy(payable(WinddownConstants.BALANCE_CLAIMER_PROXY));
 
         uint256 _deployerPk = vm.envUint("PRIVATE_KEY_DEPLOYER");
-        address _deployer = vm.addr(_deployerPk);
 
-        // 1. Deploy the v2 implementation (broadcast from deployer).
-        vm.startBroadcast(_deployer);
+        // 1. Deploy the v2 implementation. Sign locally with the loaded
+        //    private key so the deployer broadcast doesn't depend on the
+        //    RPC having an unlocked account.
+        vm.startBroadcast(_deployerPk);
         BalanceClaimer newImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: WinddownConstants.OPTIMISM_PORTAL_PROXY,
             _erc20BalanceWithdrawer: WinddownConstants.L1_STANDARD_BRIDGE_PROXY,
