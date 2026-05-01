@@ -22,7 +22,6 @@ contract BalanceClaimer_TestBase is BalanceClaimer_Initializer {
     address mockOptimismPortal = makeAddr("mockOptimismPortal");
     address mockL1StandardBridge = makeAddr("mockL1StandardBridge");
     address mockFoundation = makeAddr("mockFoundation");
-    address mockTimelock = makeAddr("mockTimelock");
     bytes32 mockRoot = keccak256("mockRoot");
 
     function setUp() public virtual override {
@@ -33,8 +32,7 @@ contract BalanceClaimer_TestBase is BalanceClaimer_Initializer {
             _ethBalanceWithdrawer: address(mockOptimismPortal),
             _erc20BalanceWithdrawer: address(mockL1StandardBridge),
             _root: mockRoot,
-            _foundation: mockFoundation,
-            _timelock: mockTimelock
+            _foundation: mockFoundation
         });
 
         vm.prank(multisig);
@@ -146,8 +144,7 @@ contract BalanceClaimer_Test is BalanceClaimer_TestBase {
             _ethBalanceWithdrawer: address(mockOptimismPortal),
             _erc20BalanceWithdrawer: address(mockL1StandardBridge),
             _root: _root,
-            _foundation: mockFoundation,
-            _timelock: mockTimelock
+            _foundation: mockFoundation
         });
         vm.prank(multisig);
         Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(balanceClaimerImpl));

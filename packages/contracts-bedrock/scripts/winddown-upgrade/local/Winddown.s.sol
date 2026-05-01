@@ -39,8 +39,7 @@ contract WinddownUpgrade is Script {
             _ethBalanceWithdrawer: address(optimismPortalProxy),
             _erc20BalanceWithdrawer: address(l1StandardBridgeProxy),
             _root: WinddownConstants.MERKLE_ROOT,
-            _foundation: WinddownConstants.FOUNDATION_RECEIVER,
-            _timelock: WinddownConstants.TIMELOCK_RECEIVER
+            _foundation: WinddownConstants.FOUNDATION_RECEIVER
         });
 
         // Set BalanceClaimer implementation
