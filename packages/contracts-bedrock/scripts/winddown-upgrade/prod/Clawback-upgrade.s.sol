@@ -25,7 +25,6 @@ contract ClawbackUpgrade is Script {
         require(_newImpl != address(0), "newImpl is zero");
         require(_newImpl.code.length > 0, "newImpl has no code");
         require(BalanceClaimer(_newImpl).FOUNDATION() != address(0), "newImpl: FOUNDATION unset");
-        require(BalanceClaimer(_newImpl).TIMELOCK() != address(0), "newImpl: TIMELOCK unset");
 
         bytes memory _innerCall = abi.encodeCall(BalanceClaimer.clawback, ());
         bytes memory _outerCall =
