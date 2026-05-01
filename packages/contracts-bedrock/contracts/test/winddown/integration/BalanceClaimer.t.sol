@@ -232,19 +232,21 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     }
 }
 
-/// @notice Permissive ERC20 used by the clawback integration tests. Unlike
-///         OpenZeppelin's ERC20, transfers to {address(0)} are allowed so the
-///         placeholder `FOUNDATION = TIMELOCK = address(0)` receivers do not
-///         cause `safeTransfer` to revert. Bytecode is `vm.etch`-ed at the
-///         hardcoded mainnet token addresses referenced by {clawback}.
-contract PermissiveMockERC20 {
+/// @notice Minimal ERC20 used in the clawback integration tests. Mirrors
+///         OpenZeppelin's zero-address guard on transfer so the suite
+///         exercises the same revert path real DAI/USDC/USDT/GTC implement.
+///         Bytecode is `vm.etch`-ed at the hardcoded mainnet token addresses
+///         referenced by {clawback}.
+contract MockERC20 {
     mapping(address => uint256) public balanceOf;
 
     function mint(address _to, uint256 _amount) external {
+        require(_to != address(0), "ERC20: mint to the zero address");
         balanceOf[_to] += _amount;
     }
 
     function transfer(address _to, uint256 _amount) external returns (bool) {
+        require(_to != address(0), "ERC20: transfer to the zero address");
         balanceOf[msg.sender] -= _amount;
         balanceOf[_to] += _amount;
         return true;
@@ -254,8 +256,6 @@ contract PermissiveMockERC20 {
 contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
     event Clawback(address indexed foundation, address indexed timelock);
 
-    address constant FOUNDATION = address(0);
-    address constant TIMELOCK = address(0);
     address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
@@ -267,24 +267,29 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
     uint256 constant SEED_GTC = 4000;
     uint256 constant SEED_ETH = 100 ether;
 
+    address foundation = makeAddr("clawbackFoundation");
+    address timelock = makeAddr("clawbackTimelock");
+
     BalanceClaimer clawbackImpl;
 
     function setUp() public override {
         super.setUp();
 
-        // Etch a permissive ERC20 implementation at each hardcoded token
-        // address so transfers to address(0) succeed.
-        bytes memory _code = address(new PermissiveMockERC20()).code;
+        // Etch a strict ERC20 implementation at each hardcoded token address so
+        // calls to {balanceOf} and {transfer} resolve. The mock keeps OZ's
+        // zero-address guard intact, so the suite still validates the real
+        // failure mode if FOUNDATION/TIMELOCK were ever zeroed.
+        bytes memory _code = address(new MockERC20()).code;
         vm.etch(DAI, _code);
         vm.etch(USDC, _code);
         vm.etch(USDT, _code);
         vm.etch(GTC, _code);
 
         // Seed the L1StandardBridge with token balances and the OptimismPortal with ETH.
-        PermissiveMockERC20(DAI).mint(address(L1Bridge), SEED_DAI);
-        PermissiveMockERC20(USDC).mint(address(L1Bridge), SEED_USDC);
-        PermissiveMockERC20(USDT).mint(address(L1Bridge), SEED_USDT);
-        PermissiveMockERC20(GTC).mint(address(L1Bridge), SEED_GTC);
+        MockERC20(DAI).mint(address(L1Bridge), SEED_DAI);
+        MockERC20(USDC).mint(address(L1Bridge), SEED_USDC);
+        MockERC20(USDT).mint(address(L1Bridge), SEED_USDT);
+        MockERC20(GTC).mint(address(L1Bridge), SEED_GTC);
         vm.deal(address(op), SEED_ETH);
 
         // Deploy the new BalanceClaimer implementation. The Merkle root is a
@@ -293,12 +298,14 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         clawbackImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: address(op),
             _erc20BalanceWithdrawer: address(L1Bridge),
-            _root: keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT")
+            _root: keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT"),
+            _foundation: foundation,
+            _timelock: timelock
         });
     }
 
-    /// @dev Asserts the source contracts are drained and the totals landed at the receivers.
-    ///      FOUNDATION and TIMELOCK are both `address(0)` so we assert against the joint sink.
+    /// @dev Asserts the source contracts are drained and each receiver got the
+    ///      expected half (with the odd-unit remainder landing at TIMELOCK).
     function _assertDrained() internal view {
         assertEq(address(op).balance, 0);
         assertEq(IERC20(DAI).balanceOf(address(L1Bridge)), 0);
@@ -306,11 +313,17 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         assertEq(IERC20(USDT).balanceOf(address(L1Bridge)), 0);
         assertEq(IERC20(GTC).balanceOf(address(L1Bridge)), 0);
 
-        assertEq(address(0).balance, SEED_ETH);
-        assertEq(IERC20(DAI).balanceOf(address(0)), SEED_DAI);
-        assertEq(IERC20(USDC).balanceOf(address(0)), SEED_USDC);
-        assertEq(IERC20(USDT).balanceOf(address(0)), SEED_USDT);
-        assertEq(IERC20(GTC).balanceOf(address(0)), SEED_GTC);
+        assertEq(foundation.balance, SEED_ETH / 2);
+        assertEq(timelock.balance, SEED_ETH - SEED_ETH / 2);
+
+        assertEq(IERC20(DAI).balanceOf(foundation), SEED_DAI / 2);
+        assertEq(IERC20(DAI).balanceOf(timelock), SEED_DAI - SEED_DAI / 2);
+        assertEq(IERC20(USDC).balanceOf(foundation), SEED_USDC / 2);
+        assertEq(IERC20(USDC).balanceOf(timelock), SEED_USDC - SEED_USDC / 2);
+        assertEq(IERC20(USDT).balanceOf(foundation), SEED_USDT / 2);
+        assertEq(IERC20(USDT).balanceOf(timelock), SEED_USDT - SEED_USDT / 2);
+        assertEq(IERC20(GTC).balanceOf(foundation), SEED_GTC / 2);
+        assertEq(IERC20(GTC).balanceOf(timelock), SEED_GTC - SEED_GTC / 2);
     }
 
     /// @dev Atomic upgrade-and-drain: governance executes a single tx that swaps the impl and
@@ -319,7 +332,7 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         bytes memory _data = abi.encodeWithSelector(BalanceClaimer.clawback.selector);
 
         vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(FOUNDATION, TIMELOCK);
+        emit Clawback(foundation, timelock);
 
         vm.prank(multisig);
         Proxy(payable(address(balanceClaimerProxy))).upgradeToAndCall(address(clawbackImpl), _data);
@@ -333,7 +346,7 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(clawbackImpl));
 
         vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(FOUNDATION, TIMELOCK);
+        emit Clawback(foundation, timelock);
 
         vm.prank(makeAddr("anyone"));
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
@@ -341,7 +354,8 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         _assertDrained();
     }
 
-    /// @dev After draining, a second `clawback()` is a no-op on balances and still emits the event.
+    /// @dev After draining, a second `clawback()` is a balance no-op (the
+    ///      bridge / portal stay empty) and still emits the event.
     function test_clawback_idempotent() external {
         vm.prank(multisig);
         Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(clawbackImpl));
@@ -349,9 +363,10 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
         _assertDrained();
 
-        // Second call: balances are zero, so the bridge/portal stay drained.
+        // Second call: balances are zero, so the bridge/portal stay drained
+        // and receiver totals don't move.
         vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(FOUNDATION, TIMELOCK);
+        emit Clawback(foundation, timelock);
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
 
         _assertDrained();
