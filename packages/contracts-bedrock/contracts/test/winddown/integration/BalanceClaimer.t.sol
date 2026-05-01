@@ -254,7 +254,11 @@ contract MockERC20 {
 }
 
 contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
-    event Clawback(address indexed foundation);
+    event Clawback(
+        address indexed foundation,
+        uint256 ethTotal,
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] erc20Totals
+    );
 
     address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
@@ -267,17 +271,17 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
     uint256 constant SEED_GTC = 4000;
     uint256 constant SEED_ETH = 100 ether;
 
-    address foundation = makeAddr("clawbackFoundation");
+    address foundation;
 
     BalanceClaimer clawbackImpl;
 
     function setUp() public override {
         super.setUp();
 
-        // Etch a strict ERC20 implementation at each hardcoded token address so
-        // calls to {balanceOf} and {transfer} resolve. The mock keeps OZ's
-        // zero-address guard intact, so the suite still validates the real
-        // failure mode if FOUNDATION were ever zeroed.
+        // Etch a strict ERC20 implementation at each hardcoded token address
+        // so calls to {balanceOf} and {transfer} resolve. The mock keeps OZ's
+        // zero-address guard intact, so any regression that pointed
+        // {clawback} at address(0) would still be caught.
         bytes memory _code = address(new MockERC20()).code;
         vm.etch(DAI, _code);
         vm.etch(USDC, _code);
@@ -297,9 +301,19 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         clawbackImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: address(op),
             _erc20BalanceWithdrawer: address(L1Bridge),
-            _root: keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT"),
-            _foundation: foundation
+            _root: keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT")
         });
+
+        foundation = clawbackImpl.FOUNDATION();
+    }
+
+    /// @dev Build the seeded-token claim array (filtered like {clawback} does).
+    function _seedClaims() internal pure returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _out) {
+        _out = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](4);
+        _out[0] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: DAI, balance: SEED_DAI });
+        _out[1] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDC, balance: SEED_USDC });
+        _out[2] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDT, balance: SEED_USDT });
+        _out[3] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: GTC, balance: SEED_GTC });
     }
 
     /// @dev Asserts the bridge and portal are drained and FOUNDATION received the full totals.
@@ -323,7 +337,7 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         bytes memory _data = abi.encodeWithSelector(BalanceClaimer.clawback.selector);
 
         vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(foundation);
+        emit Clawback(foundation, SEED_ETH, _seedClaims());
 
         vm.prank(multisig);
         Proxy(payable(address(balanceClaimerProxy))).upgradeToAndCall(address(clawbackImpl), _data);
@@ -337,7 +351,7 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(clawbackImpl));
 
         vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(foundation);
+        emit Clawback(foundation, SEED_ETH, _seedClaims());
 
         vm.prank(makeAddr("anyone"));
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
@@ -345,8 +359,9 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         _assertDrained();
     }
 
-    /// @dev After draining, a second `clawback()` is a balance no-op (the
-    ///      bridge / portal stay empty) and still emits the event.
+    /// @dev After draining, a second `clawback()` is a balance no-op and emits
+    ///      the event with zero ETH total and an empty erc20 totals array
+    ///      (since clawback filters zero-balance tokens).
     function test_clawback_idempotent() external {
         vm.prank(multisig);
         Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(clawbackImpl));
@@ -354,10 +369,9 @@ contract BalanceClaimer_Clawback_Integration_Test is Bridge_Initializer {
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
         _assertDrained();
 
-        // Second call: balances are zero, so the bridge/portal stay drained
-        // and receiver totals don't move.
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _empty;
         vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(foundation);
+        emit Clawback(foundation, 0, _empty);
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
 
         _assertDrained();
