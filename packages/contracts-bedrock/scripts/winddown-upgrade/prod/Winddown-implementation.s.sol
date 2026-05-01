@@ -28,7 +28,9 @@ contract WinddownImplementationDeploy is Script {
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: WinddownConstants.OPTIMISM_PORTAL_PROXY,
             _erc20BalanceWithdrawer: WinddownConstants.L1_STANDARD_BRIDGE_PROXY,
-            _root: WinddownConstants.MERKLE_ROOT
+            _root: WinddownConstants.MERKLE_ROOT,
+            _foundation: WinddownConstants.FOUNDATION_RECEIVER,
+            _timelock: WinddownConstants.TIMELOCK_RECEIVER
         });
 
          // Set BalanceClaimer implementation

@@ -35,8 +35,13 @@ contract BalanceClaimerSetup is CommonBase, StdUtils, Claims {
         L1ChugSplashProxy l1StandardBridgeProxy = new L1ChugSplashProxy(address(this));
         Proxy optimismPortalProxy = new Proxy(address(this));
 
-        BalanceClaimer balanceClaimerImpl =
-            new BalanceClaimer(address(optimismPortalProxy), address(l1StandardBridgeProxy), tree[0]);
+        BalanceClaimer balanceClaimerImpl = new BalanceClaimer(
+            address(optimismPortalProxy),
+            address(l1StandardBridgeProxy),
+            tree[0],
+            address(uint160(uint256(keccak256("foundationReceiver")))),
+            address(uint160(uint256(keccak256("timelockReceiver"))))
+        );
 
         // Set BalanceClaimer implementation
         balanceClaimerProxy.upgradeTo(address(balanceClaimerImpl));

@@ -28,6 +28,12 @@ interface IBalanceClaimer {
     /// @notice Thrown when the merkle root is invalid
     error InvalidMerkleRoot();
 
+    /// @notice Thrown when the FOUNDATION or TIMELOCK constructor argument is
+    ///         `address(0)`. Acts as a deploy-time guard against shipping a
+    ///         clawback impl that would either burn ERC20s on transfer-to-zero
+    ///         (USDC, …) or send ETH into the void.
+    error UnsetReceiver();
+
     /// @notice the root of the merkle tree
     function ROOT() external view returns (bytes32);
 
@@ -39,6 +45,12 @@ interface IBalanceClaimer {
 
     /// @notice return users who claimed their balances
     function claimed(address) external view returns (bool);
+
+    /// @notice Receiver of half of the clawed-back funds.
+    function FOUNDATION() external view returns (address);
+
+    /// @notice Receiver of the other half of the clawed-back funds.
+    function TIMELOCK() external view returns (address);
 
     /**
      * @notice Claims the tokens for the user

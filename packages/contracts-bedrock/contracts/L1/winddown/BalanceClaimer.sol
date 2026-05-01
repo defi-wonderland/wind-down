@@ -32,13 +32,11 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
     /// @inheritdoc IBalanceClaimer
     mapping(address => bool) public claimed;
 
-    /// @notice Receiver of half of the clawed-back funds.
-    /// TODO: confirm address before deployment.
-    address public constant FOUNDATION = address(0);
+    /// @inheritdoc IBalanceClaimer
+    address public immutable FOUNDATION;
 
-    /// @notice Receiver of half of the clawed-back funds.
-    /// TODO: confirm address before deployment.
-    address public constant TIMELOCK = address(0);
+    /// @inheritdoc IBalanceClaimer
+    address public immutable TIMELOCK;
 
     /// @notice Mainnet ERC-20 addresses to drain from the L1StandardBridge.
     address public constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
@@ -55,17 +53,28 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
 
     /**
      * @custom:semver 2.0.0
-     * @param _ethBalanceWithdrawer The EthBalanceWithdrawer address
+     * @param _ethBalanceWithdrawer   The EthBalanceWithdrawer address
      * @param _erc20BalanceWithdrawer The Erc20BalanceWithdrawer address
-     * @param _root The root of the merkle tree. For the clawback deployment
-     *        this is set to a non-zero garbage value so any attempt to call
-     *        {claim} reverts; funds are drained via {clawback} instead.
+     * @param _root                   The root of the merkle tree. For the clawback
+     *        deployment this is set to a non-zero garbage value so any attempt to
+     *        call {claim} reverts; funds are drained via {clawback} instead.
+     * @param _foundation             Receiver of half of the clawed-back funds.
+     * @param _timelock               Receiver of the other half of the clawed-back funds.
      */
-    constructor(address _ethBalanceWithdrawer, address _erc20BalanceWithdrawer, bytes32 _root) Semver(2, 0, 0) {
+    constructor(
+        address _ethBalanceWithdrawer,
+        address _erc20BalanceWithdrawer,
+        bytes32 _root,
+        address _foundation,
+        address _timelock
+    ) Semver(2, 0, 0) {
         if (_root == 0) revert InvalidMerkleRoot();
+        if (_foundation == address(0) || _timelock == address(0)) revert UnsetReceiver();
         ETH_BALANCE_WITHDRAWER = IEthBalanceWithdrawer(_ethBalanceWithdrawer);
         ERC20_BALANCE_WITHDRAWER = IErc20BalanceWithdrawer(_erc20BalanceWithdrawer);
         ROOT = _root;
+        FOUNDATION = _foundation;
+        TIMELOCK = _timelock;
     }
 
     /// @inheritdoc IBalanceClaimer
