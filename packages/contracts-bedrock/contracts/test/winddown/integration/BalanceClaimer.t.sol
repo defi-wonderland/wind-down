@@ -383,15 +383,52 @@ contract BalanceClaimer_Clawback_Integration_Test is Test {
         _assertDrained();
     }
 
-    /// @dev Once upgraded, `claim()` is unreachable: the garbage root makes any proof invalid.
+    /// @dev Once upgraded, `claim()` is unreachable: the garbage root makes any
+    ///      proof invalid. Uses a real, known-good proof + leaf taken from
+    ///      etherscan tx 0xc0850283f09e71a1db3ed95264236a0c8c7825874c81c38ea1b8bbd13fd7a901
+    ///      (which would succeed against the v1 root) so the test demonstrates
+    ///      that previously-valid proofs are also rejected after the upgrade.
+    ///      Re-forks one block before that tx (block 24988750) so the user's
+    ///      claim slot has not yet been spent.
     function test_claim_revertsAfterClawbackUpgrade() external {
-        vm.prank(proxyAdmin);
-        Proxy(payable(CLAIMER_PROXY)).upgradeTo(address(clawbackImpl));
+        vm.createSelectFork(vm.envString("ETHEREUM_MAINNET_RPC"), 24988750);
 
-        bytes32[] memory _emptyProof;
+        // Re-deploy / re-resolve the per-fork state since switching forks
+        // discards the prior fork's deployments and balances.
+        BalanceClaimer _impl = new BalanceClaimer({
+            _ethBalanceWithdrawer: PORTAL,
+            _erc20BalanceWithdrawer: BRIDGE,
+            _root: keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT")
+        });
+        address _admin = address(uint160(uint256(vm.load(CLAIMER_PROXY, ADMIN_SLOT))));
+        vm.deal(_admin, 1 ether);
+
+        vm.prank(_admin);
+        Proxy(payable(CLAIMER_PROXY)).upgradeTo(address(_impl));
+
+        bytes32[] memory _proof = new bytes32[](16);
+        _proof[0] = 0x781c819247e0a7cae10a834cbc59880488386c2b8da0789925ca81e50ca33c4d;
+        _proof[1] = 0xc50bd1e13b926bf2d795a5a64c5b795ee699f7cd6890c77e730402094a9e20dc;
+        _proof[2] = 0xd53fbb35642fa80c1ed1cb94b66e56267522f8469a838b4f7447c3f96de3d677;
+        _proof[3] = 0xb2cc62f79aaa3532dbb9b97041114fe4f76a7cf4571fac4f687693fd9b321d0b;
+        _proof[4] = 0xb0b916a2019f5215bd0db2d21d27e3305f5ea0fca320c87e32c6fd7809e12a40;
+        _proof[5] = 0x2ac80b385b3e569b6e71a679431c13fc3af1fabe055074526ecf6551d00c1fea;
+        _proof[6] = 0x83a6881191897386c1917444659cbe3e0c8178d5e04947471a6aecef13c6cd3d;
+        _proof[7] = 0x65585350a4944fe892f7b1fd513ed6edff99aaa592cc190d30fae2067fcb690e;
+        _proof[8] = 0xee707eec4a25b8e1a7fc8204f78cfb241ba35267726470efbb87d3e8b04f5c34;
+        _proof[9] = 0x9e52da07cf5f10a0ea4b2611010d43b9fa987be00b15beaf67c3f1dbd904f65d;
+        _proof[10] = 0x2c3b19333e21d301b921212075add902d6479648ca7865cf3e9b56b4b2c47f79;
+        _proof[11] = 0xc90800e8cfe290a7729988032cf208baba39f8ec5c4f073912c8c8c38b098147;
+        _proof[12] = 0x106c0622b98e333cc092189d41cd7ab58e24056b1d1d30d823c240360c5bd508;
+        _proof[13] = 0x2727dc7b0a0329bcd31555bd44abef5dadb7c2cd5d93876fed76b2c27ca22c9b;
+        _proof[14] = 0xb9fcfa5bca8595c776bb17b5108605d04ff89c05f2e887ab9b086a9fe2e0a20c;
+        _proof[15] = 0xf8f601232c9da0994e3b97085584a5b49c98d95cf2746e6abc14e3c5f662c0db;
+
+        address _user = 0xB12897740478eeC7B86b9eBf14245cDAcBBa4F2f;
+        uint256 _ethBalance = 689255307889765;
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _emptyClaim;
 
         vm.expectRevert(IBalanceClaimer.NoBalanceToClaim.selector);
-        IBalanceClaimer(CLAIMER_PROXY).claim(_emptyProof, makeAddr("eve"), 0, _emptyClaim);
+        IBalanceClaimer(CLAIMER_PROXY).claim(_proof, _user, _ethBalance, _emptyClaim);
     }
 }
