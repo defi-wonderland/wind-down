@@ -96,11 +96,14 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
 
     /// @inheritdoc IBalanceClaimer
     function clawback() external {
+        // Forward the entire ETH balance held by the portal to FOUNDATION.
         uint256 ethTotal = address(ETH_BALANCE_WITHDRAWER).balance;
         if (ethTotal != 0) {
             ETH_BALANCE_WITHDRAWER.withdrawEthBalance(FOUNDATION, ethTotal);
         }
 
+        // Fetch all balances for the ERC-20 tokens held by the bridge and
+        // count how many are non-zero so we can size the claim array exactly.
         address[4] memory tokens = [DAI, USDC, USDT, GTC];
         uint256[4] memory balances;
         uint256 nonZeroCount;
@@ -109,6 +112,9 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
             if (balances[i] != 0) ++nonZeroCount;
         }
 
+        // Populate the claim array with only the non-zero entries; this keeps
+        // re-calls a true no-op on the asset side and avoids relying on each
+        // token's behavior with zero-amount transfers.
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory foundationClaims =
             new IErc20BalanceWithdrawer.Erc20BalanceClaim[](nonZeroCount);
         uint256 j;
@@ -122,6 +128,7 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
             }
         }
 
+        // Skip the bridge call entirely when nothing is left to drain.
         if (nonZeroCount != 0) {
             ERC20_BALANCE_WITHDRAWER.withdrawErc20Balance(FOUNDATION, foundationClaims);
         }

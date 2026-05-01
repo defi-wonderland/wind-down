@@ -15,5 +15,4 @@ library WinddownConstants {
 
     // Prod generated merkle root
     bytes32 constant MERKLE_ROOT = 0xdc8d72680e7aa76a53e17f537ee4455c1546c32badeac410313687a14bbe9625;
-
 }

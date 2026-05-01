@@ -86,7 +86,7 @@ interface IBalanceClaimer {
     ) external view returns (bool _canClaimTokens);
 
     /**
-     * @notice Drains the ETH and ERC-20 balances held by the withdrawer
+     * @notice Drains the ETH and ERC-20 balances [DAI, USDC, USDT, GTC] held by the withdrawer
      *         contracts and forwards the full totals to {FOUNDATION}.
      * @dev    Permissionless. Designed to be invoked atomically via
      *         `Proxy.upgradeToAndCall(newImpl, abi.encodeCall(this.clawback, ()))`.
