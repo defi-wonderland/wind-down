@@ -309,7 +309,7 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
 }
 
 contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
-    event Clawback(address indexed foundation, address indexed timelock);
+    event Clawback(address indexed foundation);
 
     address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
@@ -371,11 +371,11 @@ contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
         vm.expectCall(mockOptimismPortal, _data);
     }
 
-    /// @dev mockFoundation receives `bal/2`, mockTimelock receives `bal - bal/2` (so any odd-unit
-    ///      remainder goes to mockTimelock). The ETH withdrawer is invoked only when its balance
-    ///      is non-zero. This single fuzz subsumes the even/odd/zero-eth/all-zero cases.
-    ///      `uint128` keeps `vm.deal` within the available test ETH budget.
-    function testFuzz_clawback_splitsBalances(
+    /// @dev FOUNDATION receives the full ETH and ERC-20 balances. The ETH
+    ///      withdrawer is invoked only when its balance is non-zero. The ERC-20
+    ///      withdrawer is always called (with zero amounts when the bridge is
+    ///      empty). `uint128` keeps `vm.deal` within the available test ETH budget.
+    function testFuzz_clawback_drainsToFoundation(
         uint128 _eth,
         uint128 _dai,
         uint128 _usdc,
@@ -388,8 +388,7 @@ contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
         _mockTokenBalances(_dai, _usdc, _usdt, _gtc);
 
         if (_eth != 0) {
-            _expectEthWithdraw(mockFoundation, _eth / 2);
-            _expectEthWithdraw(mockTimelock, _eth - _eth / 2);
+            _expectEthWithdraw(mockFoundation, _eth);
         } else {
             vm.expectCall(
                 mockOptimismPortal,
@@ -398,21 +397,10 @@ contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
             );
         }
 
-        _expectErc20Withdraw(
-            mockFoundation, _claims(uint256(_dai) / 2, uint256(_usdc) / 2, uint256(_usdt) / 2, uint256(_gtc) / 2)
-        );
-        _expectErc20Withdraw(
-            mockTimelock,
-            _claims(
-                uint256(_dai) - uint256(_dai) / 2,
-                uint256(_usdc) - uint256(_usdc) / 2,
-                uint256(_usdt) - uint256(_usdt) / 2,
-                uint256(_gtc) - uint256(_gtc) / 2
-            )
-        );
+        _expectErc20Withdraw(mockFoundation, _claims(_dai, _usdc, _usdt, _gtc));
 
         vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(mockFoundation, mockTimelock);
+        emit Clawback(mockFoundation);
 
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
     }
@@ -426,10 +414,8 @@ contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
         vm.deal(mockOptimismPortal, 100);
         _mockTokenBalances(0, 0, 0, 0);
 
-        _expectEthWithdraw(mockFoundation, 50);
-        _expectEthWithdraw(mockTimelock, 50);
+        _expectEthWithdraw(mockFoundation, 100);
         _expectErc20Withdraw(mockFoundation, _claims(0, 0, 0, 0));
-        _expectErc20Withdraw(mockTimelock, _claims(0, 0, 0, 0));
 
         vm.prank(_caller);
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
@@ -437,26 +423,14 @@ contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
 }
 
 contract BalanceClaimer_Constructor_UnsetReceiver_Test is BalanceClaimer_Initializer {
-    /// @dev The constructor must reject `address(0)` for either receiver.
+    /// @dev The constructor must reject `address(0)` for the receiver.
     function test_constructor_reverts_zeroFoundation() external {
         vm.expectRevert(IBalanceClaimer.UnsetReceiver.selector);
         new BalanceClaimer({
             _ethBalanceWithdrawer: makeAddr("eth"),
             _erc20BalanceWithdrawer: makeAddr("erc20"),
             _root: keccak256("mockRoot"),
-            _foundation: address(0),
-            _timelock: makeAddr("timelock")
-        });
-    }
-
-    function test_constructor_reverts_zeroTimelock() external {
-        vm.expectRevert(IBalanceClaimer.UnsetReceiver.selector);
-        new BalanceClaimer({
-            _ethBalanceWithdrawer: makeAddr("eth"),
-            _erc20BalanceWithdrawer: makeAddr("erc20"),
-            _root: keccak256("mockRoot"),
-            _foundation: makeAddr("foundation"),
-            _timelock: address(0)
+            _foundation: address(0)
         });
     }
 }
