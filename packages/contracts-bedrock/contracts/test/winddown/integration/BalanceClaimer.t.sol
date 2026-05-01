@@ -393,17 +393,17 @@ contract BalanceClaimer_Clawback_Integration_Test is Test {
     function test_claim_revertsAfterClawbackUpgrade() external {
         vm.createSelectFork(vm.envString("ETHEREUM_MAINNET_RPC"), 24988750);
 
-        // Re-deploy / re-resolve the per-fork state since switching forks
-        // discards the prior fork's deployments and balances.
+        // Re-deploy the impl since switching forks discards the prior
+        // fork's deployments. The proxy admin and Foundation address are
+        // the same at both blocks, so reuse the values captured in setUp.
         BalanceClaimer _impl = new BalanceClaimer({
             _ethBalanceWithdrawer: PORTAL,
             _erc20BalanceWithdrawer: BRIDGE,
             _root: keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT")
         });
-        address _admin = address(uint160(uint256(vm.load(CLAIMER_PROXY, ADMIN_SLOT))));
-        vm.deal(_admin, 1 ether);
+        vm.deal(proxyAdmin, 1 ether);
 
-        vm.prank(_admin);
+        vm.prank(proxyAdmin);
         Proxy(payable(CLAIMER_PROXY)).upgradeTo(address(_impl));
 
         bytes32[] memory _proof = new bytes32[](16);
