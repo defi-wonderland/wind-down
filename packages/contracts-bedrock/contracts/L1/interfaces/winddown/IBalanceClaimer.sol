@@ -22,17 +22,24 @@ interface IBalanceClaimer {
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] erc20TokenBalances
     );
 
+    /**
+     * @notice Emitted once per {clawback} call.
+     * @param foundation  Foundation receiver address.
+     * @param ethTotal    Total ETH drained from the ETH withdrawer (zero on a re-call).
+     * @param erc20Totals Per-token amounts drained from the ERC-20 withdrawer.
+     *        Empty when no token had a non-zero balance (e.g. on a re-call).
+     */
+    event Clawback(
+        address indexed foundation,
+        uint256 ethTotal,
+        IErc20BalanceWithdrawer.Erc20BalanceClaim[] erc20Totals
+    );
+
     /// @notice Thrown when the user has no balance to claim
     error NoBalanceToClaim();
 
     /// @notice Thrown when the merkle root is invalid
     error InvalidMerkleRoot();
-
-    /// @notice Thrown when the FOUNDATION constructor argument is `address(0)`.
-    ///         Acts as a deploy-time guard against shipping a clawback impl
-    ///         that would either burn ERC20s on transfer-to-zero (USDC, …) or
-    ///         send ETH into the void.
-    error UnsetReceiver();
 
     /// @notice the root of the merkle tree
     function ROOT() external view returns (bytes32);
@@ -77,4 +84,16 @@ interface IBalanceClaimer {
         uint256 _ethBalance,
         IErc20BalanceWithdrawer.Erc20BalanceClaim[] calldata _erc20Claim
     ) external view returns (bool _canClaimTokens);
+
+    /**
+     * @notice Drains the ETH and ERC-20 balances held by the withdrawer
+     *         contracts and forwards the full totals to {FOUNDATION}.
+     * @dev    Permissionless. Designed to be invoked atomically via
+     *         `Proxy.upgradeToAndCall(newImpl, abi.encodeCall(this.clawback, ()))`.
+     *         Tokens with a zero balance are skipped, so a re-call after the
+     *         drain is a true no-op on the asset side (no zero-amount
+     *         transfers, no dependence on token behavior with zero amounts);
+     *         each invocation still emits {Clawback}.
+     */
+    function clawback() external;
 }

@@ -38,8 +38,7 @@ contract BalanceClaimerSetup is CommonBase, StdUtils, Claims {
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer(
             address(optimismPortalProxy),
             address(l1StandardBridgeProxy),
-            tree[0],
-            address(uint160(uint256(keccak256("foundationReceiver"))))
+            tree[0]
         );
 
         // Set BalanceClaimer implementation

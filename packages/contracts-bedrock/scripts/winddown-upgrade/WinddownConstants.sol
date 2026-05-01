@@ -16,6 +16,4 @@ library WinddownConstants {
     // Prod generated merkle root
     bytes32 constant MERKLE_ROOT = 0xdc8d72680e7aa76a53e17f537ee4455c1546c32badeac410313687a14bbe9625;
 
-    // Clawback receiver (passed to BalanceClaimer constructor; non-zero is enforced).
-    address constant FOUNDATION_RECEIVER = 0x50ccf30828DdDA5aDFd25A3CEc24b83F13496774;
 }

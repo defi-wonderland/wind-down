@@ -21,7 +21,6 @@ import { IEthBalanceWithdrawer } from "../../../L1/interfaces/winddown/IEthBalan
 contract BalanceClaimer_TestBase is BalanceClaimer_Initializer {
     address mockOptimismPortal = makeAddr("mockOptimismPortal");
     address mockL1StandardBridge = makeAddr("mockL1StandardBridge");
-    address mockFoundation = makeAddr("mockFoundation");
     bytes32 mockRoot = keccak256("mockRoot");
 
     function setUp() public virtual override {
@@ -31,8 +30,7 @@ contract BalanceClaimer_TestBase is BalanceClaimer_Initializer {
         balanceClaimerImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: address(mockOptimismPortal),
             _erc20BalanceWithdrawer: address(mockL1StandardBridge),
-            _root: mockRoot,
-            _foundation: mockFoundation
+            _root: mockRoot
         });
 
         vm.prank(multisig);
@@ -143,8 +141,7 @@ contract BalanceClaimer_Test is BalanceClaimer_TestBase {
         balanceClaimerImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: address(mockOptimismPortal),
             _erc20BalanceWithdrawer: address(mockL1StandardBridge),
-            _root: _root,
-            _foundation: mockFoundation
+            _root: _root
         });
         vm.prank(multisig);
         Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(balanceClaimerImpl));

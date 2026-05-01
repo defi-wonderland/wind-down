@@ -38,8 +38,6 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     bytes32[] leaves;
     bytes32[] tree;
 
-    address foundationReceiver = makeAddr("foundationReceiver");
-
     struct ClaimParams {
         address user;
         uint256 ethBalance;
@@ -53,8 +51,7 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
         balanceClaimerImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: address(op),
             _erc20BalanceWithdrawer: address(L1Bridge),
-            _root: keccak256("mockRoot"),
-            _foundation: foundationReceiver
+            _root: keccak256("mockRoot")
         });
 
         vm.prank(multisig);
@@ -128,8 +125,7 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
         balanceClaimerImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: address(op),
             _erc20BalanceWithdrawer: address(L1Bridge),
-            _root: _root,
-            _foundation: foundationReceiver
+            _root: _root
         });
         vm.prank(multisig);
         Proxy(payable(address(balanceClaimerProxy))).upgradeTo(address(balanceClaimerImpl));
