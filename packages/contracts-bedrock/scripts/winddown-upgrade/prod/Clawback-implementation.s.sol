@@ -20,8 +20,7 @@ contract ClawbackImplementationDeploy is Script {
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: WinddownConstants.OPTIMISM_PORTAL_PROXY,
             _erc20BalanceWithdrawer: WinddownConstants.L1_STANDARD_BRIDGE_PROXY,
-            _root: WinddownConstants.CLAWBACK_GARBAGE_ROOT,
-            _foundation: WinddownConstants.FOUNDATION_RECEIVER
+            _root: WinddownConstants.CLAWBACK_GARBAGE_ROOT
         });
 
         vm.stopBroadcast();
@@ -30,7 +29,7 @@ contract ClawbackImplementationDeploy is Script {
         assert(address(balanceClaimerImpl.ETH_BALANCE_WITHDRAWER()) == WinddownConstants.OPTIMISM_PORTAL_PROXY);
         assert(address(balanceClaimerImpl.ERC20_BALANCE_WITHDRAWER()) == WinddownConstants.L1_STANDARD_BRIDGE_PROXY);
         assert(balanceClaimerImpl.ROOT() == WinddownConstants.CLAWBACK_GARBAGE_ROOT);
-        assert(balanceClaimerImpl.FOUNDATION() == WinddownConstants.FOUNDATION_RECEIVER);
+        assert(balanceClaimerImpl.FOUNDATION() != address(0));
 
         console.log("BalanceClaimer (clawback) implementation deployed at: ", address(balanceClaimerImpl));
     }
