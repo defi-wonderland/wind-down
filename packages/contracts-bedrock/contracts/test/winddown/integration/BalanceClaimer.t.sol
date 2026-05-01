@@ -307,16 +307,22 @@ contract BalanceClaimer_Clawback_Integration_Test is Test {
 
     /// @dev Build the same filtered claim array {clawback} composes from
     ///      the real bridge balances at FORK_BLOCK.
-    function _expectedClaims() internal view returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _out) {
+    function _expectedClaims() internal view returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _claims) {
         address[4] memory _tokens = [DAI, USDC, USDT, GTC];
-        uint256[4] memory _bals = [daiTotal, usdcTotal, usdtTotal, gtcTotal];
-        uint256 _nonZero;
-        for (uint256 i; i < 4; ++i) if (_bals[i] != 0) ++_nonZero;
-        _out = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](_nonZero);
-        uint256 _j;
-        for (uint256 i; i < 4; ++i) {
-            if (_bals[i] != 0) {
-                _out[_j++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: _tokens[i], balance: _bals[i] });
+        uint256[4] memory _balances = [daiTotal, usdcTotal, usdtTotal, gtcTotal];
+        uint256 _nonZeroCount;
+        for (uint256 _i; _i < _tokens.length; ++_i) {
+            if (_balances[_i] != 0) ++_nonZeroCount;
+        }
+        _claims = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](_nonZeroCount);
+        uint256 _index;
+        for (uint256 _i; _i < _tokens.length; ++_i) {
+            if (_balances[_i] != 0) {
+                _claims[_index] = IErc20BalanceWithdrawer.Erc20BalanceClaim({
+                    token: _tokens[_i],
+                    balance: _balances[_i]
+                });
+                ++_index;
             }
         }
     }

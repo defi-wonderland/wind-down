@@ -349,19 +349,27 @@ contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
     function _claims(uint256 _dai, uint256 _usdc, uint256 _usdt, uint256 _gtc)
         internal
         pure
-        returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _out)
+        returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _filteredClaims)
     {
-        uint256 _len;
-        if (_dai != 0) ++_len;
-        if (_usdc != 0) ++_len;
-        if (_usdt != 0) ++_len;
-        if (_gtc != 0) ++_len;
-        _out = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](_len);
-        uint256 _i;
-        if (_dai != 0) { _out[_i++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: DAI, balance: _dai }); }
-        if (_usdc != 0) { _out[_i++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDC, balance: _usdc }); }
-        if (_usdt != 0) { _out[_i++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDT, balance: _usdt }); }
-        if (_gtc != 0) { _out[_i++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: GTC, balance: _gtc }); }
+        uint256 _nonZeroCount;
+        if (_dai != 0) ++_nonZeroCount;
+        if (_usdc != 0) ++_nonZeroCount;
+        if (_usdt != 0) ++_nonZeroCount;
+        if (_gtc != 0) ++_nonZeroCount;
+        _filteredClaims = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](_nonZeroCount);
+        uint256 _index;
+        if (_dai != 0) {
+            _filteredClaims[_index++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: DAI, balance: _dai });
+        }
+        if (_usdc != 0) {
+            _filteredClaims[_index++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDC, balance: _usdc });
+        }
+        if (_usdt != 0) {
+            _filteredClaims[_index++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDT, balance: _usdt });
+        }
+        if (_gtc != 0) {
+            _filteredClaims[_index++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: GTC, balance: _gtc });
+        }
     }
 
     /// @dev Mock and expect `withdrawErc20Balance(_user, _claims)` against the bridge.
