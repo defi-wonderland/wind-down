@@ -37,6 +37,19 @@ contract ClawbackUpgrade is Script {
         );
         require(_impl.FOUNDATION() == WinddownConstants.FOUNDATION, "newImpl: wrong FOUNDATION");
 
+        // The live withdrawers must already recognize
+        // BALANCE_CLAIMER_PROXY as their authorized caller, otherwise
+        // `clawback()` will revert with `CallerNotBalanceClaimer` after the
+        // upgrade lands.
+        require(
+            _impl.ETH_BALANCE_WITHDRAWER().BALANCE_CLAIMER() == WinddownConstants.BALANCE_CLAIMER_PROXY,
+            "OptimismPortal: BALANCE_CLAIMER mismatch"
+        );
+        require(
+            _impl.ERC20_BALANCE_WITHDRAWER().BALANCE_CLAIMER() == WinddownConstants.BALANCE_CLAIMER_PROXY,
+            "L1StandardBridge: BALANCE_CLAIMER mismatch"
+        );
+
         bytes memory _innerCall = abi.encodeCall(BalanceClaimer.clawback, ());
         bytes memory _outerCall = abi.encodeCall(Proxy.upgradeToAndCall, (_newImpl, _innerCall));
 
