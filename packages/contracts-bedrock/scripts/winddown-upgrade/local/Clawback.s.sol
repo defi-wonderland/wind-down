@@ -26,6 +26,15 @@ contract ClawbackUpgradeLocal is Script {
         Proxy balanceClaimerProxy = Proxy(payable(WinddownConstants.BALANCE_CLAIMER_PROXY));
 
         uint256 _deployerPk = vm.envUint("PRIVATE_KEY_DEPLOYER");
+        address _deployer = vm.addr(_deployerPk);
+
+        // Local-only: ensure the deployer has gas on the fork so the rehearsal
+        // doesn't fail on `insufficient funds` when the env key happens to be a
+        // fresh address with zero mainnet balance. Real-mainnet underfunding
+        // gets caught by `deploy-prod-simulation:clawback`.
+        vm.rpc(
+            "anvil_setBalance", string.concat("[\"", vm.toString(_deployer), "\",\"0xde0b6b3a7640000\"]")
+        );
 
         // 1. Deploy the v2 implementation. Sign locally with the loaded
         //    private key so the deployer broadcast doesn't depend on the
