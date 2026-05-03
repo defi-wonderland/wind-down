@@ -38,8 +38,7 @@ contract ClawbackUpgrade is Script {
         require(_impl.FOUNDATION() == WinddownConstants.FOUNDATION, "newImpl: wrong FOUNDATION");
 
         bytes memory _innerCall = abi.encodeCall(BalanceClaimer.clawback, ());
-        bytes memory _outerCall =
-            abi.encodeWithSelector(Proxy.upgradeToAndCall.selector, _newImpl, _innerCall);
+        bytes memory _outerCall = abi.encodeCall(Proxy.upgradeToAndCall, (_newImpl, _innerCall));
 
         console.log("=== Clawback upgrade payload ===");
         console.log("target (BalanceClaimer Proxy):", WinddownConstants.BALANCE_CLAIMER_PROXY);
