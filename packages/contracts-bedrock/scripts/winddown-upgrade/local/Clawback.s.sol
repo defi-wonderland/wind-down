@@ -25,10 +25,31 @@ contract ClawbackUpgradeLocal is Script {
     /// @dev EIP-1967 admin slot: `bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)`.
     bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
+    /// @dev Mirror the four token addresses baked into `BalanceClaimer` so we
+    ///      can read pre-clawback balances before the new impl is deployed.
+    ///      Keep in sync with `contracts/L1/winddown/BalanceClaimer.sol`.
+    address internal constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    address internal constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address internal constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    address internal constant GTC = 0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F;
+
+    /// @dev ETH balance of one account + ERC-20 balances of another account, in
+    ///      the canonical [DAI, USDC, USDT, GTC] order.
+    struct Snapshot {
+        uint256 eth;
+        uint256[4] tokens;
+    }
+
     function run() public {
         require(WinddownConstants.BALANCE_CLAIMER_PROXY != address(0), "BALANCE_CLAIMER_PROXY unset in WinddownConstants");
 
         Proxy balanceClaimerProxy = Proxy(payable(WinddownConstants.BALANCE_CLAIMER_PROXY));
+        address foundation = WinddownConstants.FOUNDATION;
+
+        // Capture pre-clawback balances so we can verify the funds actually
+        // land at FOUNDATION, not just that the source contracts emptied.
+        Snapshot memory _sourcesBefore = _snapshot(WinddownConstants.OPTIMISM_PORTAL_PROXY, WinddownConstants.L1_STANDARD_BRIDGE_PROXY);
+        Snapshot memory _foundationBefore = _snapshot(foundation, foundation);
 
         // 1. Deploy the v2 implementation. Signing is delegated to forge's
         //    wallet flags (`--account` / `--sender`) so the deployer key
@@ -44,8 +65,7 @@ contract ClawbackUpgradeLocal is Script {
         vm.stopBroadcast();
 
         console.log("New BalanceClaimer (clawback) impl deployed at:", address(newImpl));
-
-        assert(newImpl.FOUNDATION() == WinddownConstants.FOUNDATION);
+        assert(newImpl.FOUNDATION() == foundation);
 
         // 2. Upgrade-and-call as the proxy admin. Tell the local anvil node to
         //    impersonate the admin (no private key on this machine) and fund it
@@ -55,38 +75,45 @@ contract ClawbackUpgradeLocal is Script {
 
         string memory _adminArg = string.concat("[\"", vm.toString(admin), "\"]");
         vm.rpc("anvil_impersonateAccount", _adminArg);
-        vm.rpc(
-            "anvil_setBalance", string.concat("[\"", vm.toString(admin), "\",\"0xde0b6b3a7640000\"]")
-        );
+        vm.rpc("anvil_setBalance", string.concat("[\"", vm.toString(admin), "\",\"0xde0b6b3a7640000\"]"));
 
-        // Generate same calldata as for Safe tx-builder
-        bytes memory _innerCall = abi.encodeCall(BalanceClaimer.clawback, ());
-        bytes memory _outerCall = abi.encodeCall(Proxy.upgradeToAndCall, (address(newImpl), _innerCall));
+        // Same calldata the Safe tx-builder will execute.
+        bytes memory _outerCall =
+            abi.encodeCall(Proxy.upgradeToAndCall, (address(newImpl), abi.encodeCall(BalanceClaimer.clawback, ())));
 
         vm.startBroadcast(admin);
         (bool _success, bytes memory _returnData) = address(balanceClaimerProxy).call(_outerCall);
         vm.stopBroadcast();
 
         if (!_success) {
-            assembly {
-                revert(add(_returnData, 0x20), mload(_returnData))
-            }
+            assembly { revert(add(_returnData, 0x20), mload(_returnData)) }
         }
 
-        // 3. Assert drained.
-        BalanceClaimer impl = BalanceClaimer(WinddownConstants.BALANCE_CLAIMER_PROXY);
-        address bridge = WinddownConstants.L1_STANDARD_BRIDGE_PROXY;
+        _assertDrained(_sourcesBefore, _foundationBefore);
+    }
 
-        assert(WinddownConstants.OPTIMISM_PORTAL_PROXY.balance == 0);
-        assert(IERC20(impl.DAI()).balanceOf(bridge) == 0);
-        assert(IERC20(impl.USDC()).balanceOf(bridge) == 0);
-        assert(IERC20(impl.USDT()).balanceOf(bridge) == 0);
-        assert(IERC20(impl.GTC()).balanceOf(bridge) == 0);
+    /// @dev Returns `_ethHolder`'s ETH balance and `_tokenHolder`'s balances
+    ///      across the four clawback-tracked tokens.
+    function _snapshot(address _ethHolder, address _tokenHolder) internal view returns (Snapshot memory _s) {
+        _s.eth = _ethHolder.balance;
+        address[4] memory _tokens = [DAI, USDC, USDT, GTC];
+        for (uint256 _i; _i < _tokens.length; ++_i) {
+            _s.tokens[_i] = IERC20(_tokens[_i]).balanceOf(_tokenHolder);
+        }
+    }
 
-        console.log("Clawback executed. Portal ETH balance:", WinddownConstants.OPTIMISM_PORTAL_PROXY.balance);
-        console.log("Bridge DAI balance: ", IERC20(impl.DAI()).balanceOf(bridge));
-        console.log("Bridge USDC balance:", IERC20(impl.USDC()).balanceOf(bridge));
-        console.log("Bridge USDT balance:", IERC20(impl.USDT()).balanceOf(bridge));
-        console.log("Bridge GTC balance: ", IERC20(impl.GTC()).balanceOf(bridge));
+    function _assertDrained(Snapshot memory _sourcesBefore, Snapshot memory _foundationBefore) internal view {
+        Snapshot memory _sourcesAfter = _snapshot(WinddownConstants.OPTIMISM_PORTAL_PROXY, WinddownConstants.L1_STANDARD_BRIDGE_PROXY);
+        Snapshot memory _foundationAfter = _snapshot(WinddownConstants.FOUNDATION, WinddownConstants.FOUNDATION);
+
+        assert(_sourcesAfter.eth == 0);
+        assert(_foundationAfter.eth == _foundationBefore.eth + _sourcesBefore.eth);
+        string[4] memory _names = ["DAI", "USDC", "USDT", "GTC"];
+        for (uint256 _i; _i < _names.length; ++_i) {
+            assert(_sourcesAfter.tokens[_i] == 0);
+            assert(_foundationAfter.tokens[_i] == _foundationBefore.tokens[_i] + _sourcesBefore.tokens[_i]);
+            console.log(string.concat("Foundation ", _names[_i], " delta:"), _foundationAfter.tokens[_i] - _foundationBefore.tokens[_i]);
+        }
+        console.log("Foundation ETH delta:", _foundationAfter.eth - _foundationBefore.eth);
     }
 }
