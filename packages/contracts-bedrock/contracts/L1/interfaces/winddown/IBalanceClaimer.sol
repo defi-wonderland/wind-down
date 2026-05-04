@@ -41,6 +41,13 @@ interface IBalanceClaimer {
     /// @notice Thrown when the merkle root is invalid
     error InvalidMerkleRoot();
 
+    /// @notice Thrown by {clawback} if FOUNDATION's balance of any drained
+    ///         asset did not increase by exactly the amount the bridge /
+    ///         portal held pre-call. Catches fee-on-transfer / blacklist /
+    ///         pause edge cases where a transfer succeeds but doesn't deliver
+    ///         the full amount.
+    error ClawbackBalanceMismatch();
+
     /// @notice the root of the merkle tree
     function ROOT() external view returns (bytes32);
 

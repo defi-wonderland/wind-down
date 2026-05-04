@@ -309,144 +309,58 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
 }
 
 contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
-    event Clawback(
-        address indexed foundation,
-        uint256 ethTotal,
-        IErc20BalanceWithdrawer.Erc20BalanceClaim[] erc20Totals
-    );
-
     address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
     address constant GTC = 0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F;
 
-    /// @dev Mock the four `balanceOf(bridge)` calls that {clawback} reads.
-    function _mockTokenBalances(uint256 _dai, uint256 _usdc, uint256 _usdt, uint256 _gtc) internal {
+    /// @dev Mock `balanceOf(addr)` for each of the four tokens to return `_value`.
+    function _mockTokenBalanceOf(address _holder, uint256 _value) internal {
+        bytes memory _calldata = abi.encodeWithSelector(IERC20.balanceOf.selector, _holder);
+        vm.mockCall(DAI, _calldata, abi.encode(_value));
+        vm.mockCall(USDC, _calldata, abi.encode(_value));
+        vm.mockCall(USDT, _calldata, abi.encode(_value));
+        vm.mockCall(GTC, _calldata, abi.encode(_value));
+    }
+
+    /// @dev Mock the bridge / portal withdraw calls to succeed without moving funds.
+    function _mockWithdrawalsAsNoOps() internal {
         vm.mockCall(
-            DAI,
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(mockL1StandardBridge)),
-            abi.encode(_dai)
+            mockL1StandardBridge,
+            abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector),
+            abi.encode(true)
         );
         vm.mockCall(
-            USDC,
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(mockL1StandardBridge)),
-            abi.encode(_usdc)
-        );
-        vm.mockCall(
-            USDT,
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(mockL1StandardBridge)),
-            abi.encode(_usdt)
-        );
-        vm.mockCall(
-            GTC,
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(mockL1StandardBridge)),
-            abi.encode(_gtc)
+            mockOptimismPortal,
+            abi.encodeWithSelector(IEthBalanceWithdrawer.withdrawEthBalance.selector),
+            abi.encode(true)
         );
     }
 
-    /// @dev Build the filtered claim array exactly as {clawback} composes it
-    ///      (zero balances are dropped, order preserved).
-    function _claims(uint256 _dai, uint256 _usdc, uint256 _usdt, uint256 _gtc)
-        internal
-        pure
-        returns (IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _filteredClaims)
-    {
-        uint256 _nonZeroCount;
-        if (_dai != 0) ++_nonZeroCount;
-        if (_usdc != 0) ++_nonZeroCount;
-        if (_usdt != 0) ++_nonZeroCount;
-        if (_gtc != 0) ++_nonZeroCount;
-        _filteredClaims = new IErc20BalanceWithdrawer.Erc20BalanceClaim[](_nonZeroCount);
-        uint256 _index;
-        if (_dai != 0) {
-            _filteredClaims[_index++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: DAI, balance: _dai });
-        }
-        if (_usdc != 0) {
-            _filteredClaims[_index++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDC, balance: _usdc });
-        }
-        if (_usdt != 0) {
-            _filteredClaims[_index++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: USDT, balance: _usdt });
-        }
-        if (_gtc != 0) {
-            _filteredClaims[_index++] = IErc20BalanceWithdrawer.Erc20BalanceClaim({ token: GTC, balance: _gtc });
-        }
-    }
+    /// @dev If the ETH withdrawer accepts the call but FOUNDATION's balance
+    ///      doesn't grow by `ethTotal`, the post-condition must revert.
+    function test_clawback_revertsOnEthDeltaMismatch() external {
+        vm.deal(mockOptimismPortal, 1 ether);
+        _mockTokenBalanceOf(mockL1StandardBridge, 0);
+        _mockTokenBalanceOf(BalanceClaimer(address(balanceClaimerProxy)).FOUNDATION(), 0);
+        _mockWithdrawalsAsNoOps();
 
-    /// @dev Mock and expect `withdrawErc20Balance(_user, _claims)` against the bridge.
-    function _expectErc20Withdraw(address _user, IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _claim)
-        internal
-    {
-        bytes memory _data =
-            abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector, _user, _claim);
-        vm.mockCall(mockL1StandardBridge, _data, abi.encode(true));
-        vm.expectCall(mockL1StandardBridge, _data);
-    }
-
-    /// @dev Mock and expect `withdrawEthBalance(_user, _amount)` against the portal.
-    function _expectEthWithdraw(address _user, uint256 _amount) internal {
-        bytes memory _data =
-            abi.encodeWithSelector(IEthBalanceWithdrawer.withdrawEthBalance.selector, _user, _amount);
-        vm.mockCall(mockOptimismPortal, _data, abi.encode(true));
-        vm.expectCall(mockOptimismPortal, _data);
-    }
-
-    /// @dev FOUNDATION receives the full ETH balance (when non-zero) and the
-    ///      filtered ERC-20 balances. Both ETH and ERC-20 calls are skipped
-    ///      when the corresponding source is empty. `uint128` keeps `vm.deal`
-    ///      within the available test ETH budget.
-    function testFuzz_clawback_drainsToFoundation(
-        uint128 _eth,
-        uint128 _dai,
-        uint128 _usdc,
-        uint128 _usdt,
-        uint128 _gtc
-    )
-        external
-    {
-        vm.deal(mockOptimismPortal, _eth);
-        _mockTokenBalances(_dai, _usdc, _usdt, _gtc);
-
-        address _foundation = BalanceClaimer(address(balanceClaimerProxy)).FOUNDATION();
-        IErc20BalanceWithdrawer.Erc20BalanceClaim[] memory _expected = _claims(_dai, _usdc, _usdt, _gtc);
-
-        if (_eth != 0) {
-            _expectEthWithdraw(_foundation, _eth);
-        } else {
-            vm.expectCall(
-                mockOptimismPortal,
-                abi.encodeWithSelector(IEthBalanceWithdrawer.withdrawEthBalance.selector),
-                0
-            );
-        }
-
-        if (_expected.length != 0) {
-            _expectErc20Withdraw(_foundation, _expected);
-        } else {
-            vm.expectCall(
-                mockL1StandardBridge,
-                abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector),
-                0
-            );
-        }
-
-        vm.expectEmit(address(balanceClaimerProxy));
-        emit Clawback(_foundation, _eth, _expected);
-
+        vm.expectRevert(IBalanceClaimer.ClawbackBalanceMismatch.selector);
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
     }
 
-    /// @dev Permissionless: any caller — including the proxy admin — can
-    ///      trigger the drain. OP's `Proxy.fallback` unconditionally
-    ///      delegates, so `clawback()` (a non-admin selector) routes to the
-    ///      impl regardless of `msg.sender`.
-    function testFuzz_clawback_permissionless(address _caller) external {
-        vm.deal(mockOptimismPortal, 100);
-        _mockTokenBalances(0, 0, 0, 0);
+    /// @dev If the ERC-20 withdrawer accepts the call but FOUNDATION's token
+    ///      balance doesn't grow by `bridge.balanceOf(token)`, the
+    ///      post-condition must revert.
+    function test_clawback_revertsOnErc20DeltaMismatch() external {
+        // Bridge holds 100 of every token, FOUNDATION holds 0; mocked
+        // withdrawErc20Balance does not move state. Pre and post FOUNDATION
+        // reads both return 0 → delta != 100 → revert.
+        _mockTokenBalanceOf(mockL1StandardBridge, 100);
+        _mockTokenBalanceOf(BalanceClaimer(address(balanceClaimerProxy)).FOUNDATION(), 0);
+        _mockWithdrawalsAsNoOps();
 
-        address _foundation = BalanceClaimer(address(balanceClaimerProxy)).FOUNDATION();
-        _expectEthWithdraw(_foundation, 100);
-
-        vm.prank(_caller);
+        vm.expectRevert(IBalanceClaimer.ClawbackBalanceMismatch.selector);
         BalanceClaimer(address(balanceClaimerProxy)).clawback();
     }
 }

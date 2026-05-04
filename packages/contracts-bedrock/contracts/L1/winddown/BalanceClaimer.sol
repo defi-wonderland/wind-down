@@ -96,6 +96,17 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
 
     /// @inheritdoc IBalanceClaimer
     function clawback() external {
+        address[4] memory tokens = [DAI, USDC, USDT, GTC];
+
+        // Snapshot FOUNDATION's pre-clawback balances so we can verify each
+        // transfer delivered the full expected amount. Catches fee-on-transfer
+        // / blacklist / pause behavior on any of the four tokens.
+        uint256 foundationEthBefore = FOUNDATION.balance;
+        uint256[4] memory foundationBefore;
+        for (uint256 i; i < tokens.length; ++i) {
+            foundationBefore[i] = IERC20(tokens[i]).balanceOf(FOUNDATION);
+        }
+
         // Forward the entire ETH balance held by the portal to FOUNDATION.
         uint256 ethTotal = address(ETH_BALANCE_WITHDRAWER).balance;
         if (ethTotal != 0) {
@@ -104,7 +115,6 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
 
         // Fetch all balances for the ERC-20 tokens held by the bridge and
         // count how many are non-zero so we can size the claim array exactly.
-        address[4] memory tokens = [DAI, USDC, USDT, GTC];
         uint256[4] memory balances;
         uint256 nonZeroCount;
         for (uint256 i; i < tokens.length; ++i) {
@@ -131,6 +141,14 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
         // Skip the bridge call entirely when nothing is left to drain.
         if (nonZeroCount != 0) {
             ERC20_BALANCE_WITHDRAWER.withdrawErc20Balance(FOUNDATION, foundationClaims);
+        }
+
+        // Post-condition: FOUNDATION received exactly what the sources held.
+        if (FOUNDATION.balance != foundationEthBefore + ethTotal) revert ClawbackBalanceMismatch();
+        for (uint256 i; i < tokens.length; ++i) {
+            if (IERC20(tokens[i]).balanceOf(FOUNDATION) != foundationBefore[i] + balances[i]) {
+                revert ClawbackBalanceMismatch();
+            }
         }
 
         emit Clawback(FOUNDATION, ethTotal, foundationClaims);
