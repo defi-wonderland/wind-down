@@ -20,7 +20,7 @@ import { SystemConfig } from "../../../contracts/L1/SystemConfig.sol";
 ///         re-deploys an implementation that is a v2 (semver 2.0.0) including
 ///         `clawback()` but wired with the real {WinddownConstants.MERKLE_ROOT},
 ///         which means a) anyone could trigger `clawback()` immediately after the
-///         deploy, and b) the FOUNDATION/TIMELOCK constants baked into the v2 impl
+///         deploy, and b) the FOUNDATION constant baked into the v2 impl
 ///         determine where funds go. Do not run this script again. Use
 ///         {Clawback-implementation.s.sol} for the clawback impl deploy and
 ///         {Clawback-upgrade.s.sol} for the governance calldata.
