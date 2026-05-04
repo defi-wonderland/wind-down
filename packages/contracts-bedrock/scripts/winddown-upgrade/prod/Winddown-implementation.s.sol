@@ -14,8 +14,23 @@ import { OptimismPortal } from "contracts/L1/OptimismPortal.sol";
 import { L2OutputOracle } from "../../../contracts/L1/L2OutputOracle.sol";
 import { SystemConfig } from "../../../contracts/L1/SystemConfig.sol";
 
+/// @notice DEPRECATED — kept for historical record of the v1 deploy that produced
+///         the BalanceClaimer Proxy at {WinddownConstants.BALANCE_CLAIMER_PROXY}.
+///         After the clawback work landed in {BalanceClaimer}, running this script
+///         re-deploys an implementation that is a v2 (semver 2.0.0) including
+///         `clawback()` but wired with the real {WinddownConstants.MERKLE_ROOT},
+///         which means a) anyone could trigger `clawback()` immediately after the
+///         deploy, and b) the FOUNDATION constant baked into the v2 impl
+///         determine where funds go. Do not run this script again. Use
+///         {Clawback-implementation.s.sol} for the clawback impl deploy and
+///         {Clawback-upgrade.s.sol} for the governance calldata.
 contract WinddownImplementationDeploy is Script {
     function run() public {
+        revert(
+            "DEPRECATED: use Clawback-implementation.s.sol for the impl deploy "
+            "and Clawback-upgrade.s.sol for the governance calldata"
+        );
+
         uint256 _deployerPk = vm.envUint("PRIVATE_KEY_DEPLOYER");
         address _deployer = vm.addr(_deployerPk);
         address _balanceClaimerProxyAdmin = vm.envAddress("BALANCE_CLAIMER_PROXY_ADMIN_PUBLIC_ADDRESS");
