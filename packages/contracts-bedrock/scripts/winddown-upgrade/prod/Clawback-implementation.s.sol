@@ -11,12 +11,13 @@ import { WinddownConstants } from "../WinddownConstants.sol";
 ///         Merkle root. The address printed at the end is the only artifact this
 ///         script produces; the actual proxy upgrade is performed separately by
 ///         governance / the multisig (see Clawback-upgrade.s.sol for the calldata).
+///
+///         Signing is delegated to forge's wallet flags: pass `--account` and
+///         `--sender` (e.g. `forge script ... --account deployer --sender 0x...`)
+///         so the deployer key never has to leave the keystore.
 contract ClawbackImplementationDeploy is Script {
     function run() public {
-        uint256 _deployerPk = vm.envUint("PRIVATE_KEY_DEPLOYER");
-        // Sign locally with the loaded private key so the script doesn't
-        // depend on the RPC having an unlocked account.
-        vm.startBroadcast(_deployerPk);
+        vm.startBroadcast();
 
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: WinddownConstants.OPTIMISM_PORTAL_PROXY,

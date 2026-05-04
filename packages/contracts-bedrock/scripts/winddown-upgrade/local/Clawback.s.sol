@@ -16,6 +16,11 @@ import { WinddownConstants } from "../WinddownConstants.sol";
 ///         proxy via `upgradeToAndCall(newImpl, clawback())`, broadcast as the
 ///         proxy admin read from EIP-1967 storage. Asserts the bridge / portal
 ///         are drained afterwards.
+///
+///         The deployer broadcast is delegated to forge's wallet flags: pass
+///         `--account` and `--sender` so the deployer key stays in a keystore.
+///         The proxy-admin broadcast is impersonated via anvil RPC, no key
+///         needed.
 contract ClawbackUpgradeLocal is Script {
     /// @dev EIP-1967 admin slot: `bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)`.
     bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
@@ -25,14 +30,12 @@ contract ClawbackUpgradeLocal is Script {
 
         Proxy balanceClaimerProxy = Proxy(payable(WinddownConstants.BALANCE_CLAIMER_PROXY));
 
-        uint256 _deployerPk = vm.envUint("PRIVATE_KEY_DEPLOYER");
-
-        // 1. Deploy the v2 implementation. Sign locally with the loaded
-        //    private key so the deployer broadcast doesn't depend on the
-        //    RPC having an unlocked account.
+        // 1. Deploy the v2 implementation. Signing is delegated to forge's
+        //    wallet flags (`--account` / `--sender`) so the deployer key
+        //    stays in a keystore.
         //
         //    The deployer is intentionally NOT pre-funded here to catch a case of unfunded deployer.
-        vm.startBroadcast(_deployerPk);
+        vm.startBroadcast();
         BalanceClaimer newImpl = new BalanceClaimer({
             _ethBalanceWithdrawer: WinddownConstants.OPTIMISM_PORTAL_PROXY,
             _erc20BalanceWithdrawer: WinddownConstants.L1_STANDARD_BRIDGE_PROXY,
