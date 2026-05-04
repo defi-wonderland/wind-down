@@ -56,11 +56,19 @@ contract ClawbackUpgradeLocal is Script {
             "anvil_setBalance", string.concat("[\"", vm.toString(admin), "\",\"0xde0b6b3a7640000\"]")
         );
 
-        bytes memory _data = abi.encodeCall(BalanceClaimer.clawback, ());
+        // Generate same calldata as for Safe tx-builder
+        bytes memory _innerCall = abi.encodeCall(BalanceClaimer.clawback, ());
+        bytes memory _outerCall = abi.encodeCall(Proxy.upgradeToAndCall, (address(newImpl), _innerCall));
 
         vm.startBroadcast(admin);
-        balanceClaimerProxy.upgradeToAndCall(address(newImpl), _data);
+        (bool _success, bytes memory _returnData) = address(balanceClaimerProxy).call(_outerCall);
         vm.stopBroadcast();
+
+        if (!_success) {
+            assembly {
+                revert(add(_returnData, 0x20), mload(_returnData))
+            }
+        }
 
         // 3. Assert drained.
         BalanceClaimer impl = BalanceClaimer(WinddownConstants.BALANCE_CLAIMER_PROXY);
