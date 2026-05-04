@@ -26,15 +26,22 @@ contract ClawbackUpgrade is Script {
         require(_newImpl.code.length > 0, "newImpl has no code");
 
         BalanceClaimer _impl = BalanceClaimer(_newImpl);
+        require(
+            keccak256(bytes(_impl.version())) == keccak256(bytes("2.0.0")),
+            "newImpl: wrong semver"
+        );
         require(_impl.ROOT() == WinddownConstants.CLAWBACK_GARBAGE_ROOT, "newImpl: wrong ROOT");
-        require(
-            address(_impl.ETH_BALANCE_WITHDRAWER()) == WinddownConstants.OPTIMISM_PORTAL_PROXY,
-            "newImpl: wrong ETH_BALANCE_WITHDRAWER"
-        );
-        require(
-            address(_impl.ERC20_BALANCE_WITHDRAWER()) == WinddownConstants.L1_STANDARD_BRIDGE_PROXY,
-            "newImpl: wrong ERC20_BALANCE_WITHDRAWER"
-        );
+
+        address _ethWithdrawer = address(_impl.ETH_BALANCE_WITHDRAWER());
+        require(_ethWithdrawer != address(0), "newImpl: ETH_BALANCE_WITHDRAWER is zero");
+        require(_ethWithdrawer.code.length > 0, "newImpl: ETH_BALANCE_WITHDRAWER has no code");
+        require(_ethWithdrawer == WinddownConstants.OPTIMISM_PORTAL_PROXY, "newImpl: wrong ETH_BALANCE_WITHDRAWER");
+
+        address _erc20Withdrawer = address(_impl.ERC20_BALANCE_WITHDRAWER());
+        require(_erc20Withdrawer != address(0), "newImpl: ERC20_BALANCE_WITHDRAWER is zero");
+        require(_erc20Withdrawer.code.length > 0, "newImpl: ERC20_BALANCE_WITHDRAWER has no code");
+        require(_erc20Withdrawer == WinddownConstants.L1_STANDARD_BRIDGE_PROXY, "newImpl: wrong ERC20_BALANCE_WITHDRAWER");
+
         require(_impl.FOUNDATION() == WinddownConstants.FOUNDATION, "newImpl: wrong FOUNDATION");
 
         // The live withdrawers must already recognize
