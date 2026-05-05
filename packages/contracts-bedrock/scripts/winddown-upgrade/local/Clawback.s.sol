@@ -6,24 +6,59 @@ import { Script } from "forge-std/Script.sol";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { Proxy } from "contracts/universal/Proxy.sol";
+import { ProxyAdmin } from "contracts/universal/ProxyAdmin.sol";
 import { BalanceClaimer } from "contracts/L1/winddown/BalanceClaimer.sol";
 import { WinddownConstants } from "../WinddownConstants.sol";
 
+interface ISafe {
+    function getOwners() external view returns (address[] memory);
+    function nonce() external view returns (uint256);
+    function getTransactionHash(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        uint8 operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
+        uint256 _nonce
+    ) external view returns (bytes32);
+    function approveHash(bytes32 hashToApprove) external;
+    function execTransaction(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        uint8 operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address payable refundReceiver,
+        bytes calldata signatures
+    ) external payable returns (bool);
+}
+
 /// @notice End-to-end clawback rehearsal against an unlocked-account fork
 ///         (e.g. anvil --fork-url $ETHEREUM_MAINNET_RPC). Deploys the v2
-///         BalanceClaimer implementation and atomically upgrades the existing
-///         proxy via `upgradeToAndCall(newImpl, clawback())`, broadcast as the
-///         proxy admin read from EIP-1967 storage. Asserts the bridge / portal
-///         are drained afterwards.
+///         BalanceClaimer implementation and exercises the real prod call
+///         path: a quorum of Safe owners pre-approves the safeTxHash via
+///         `approveHash`, then `execTransaction` runs with stacked v=1
+///         pre-validated signatures. The Safe calls `ProxyAdmin.upgradeAndCall`,
+///         which in turn calls `Proxy.upgradeToAndCall` and runs `clawback()`.
+///         Asserts the bridge / portal are drained and FOUNDATION received the
+///         funds afterwards.
 ///
 ///         The deployer broadcast is delegated to forge's wallet flags: pass
 ///         `--account` and `--sender` so the deployer key stays in a keystore.
-///         The proxy-admin broadcast is impersonated via anvil RPC, no key
-///         needed.
+///         Safe owners are impersonated via `vm.prank`, no signer keys needed.
 contract ClawbackUpgradeLocal is Script {
     /// @dev EIP-1967 admin slot: `bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)`.
     bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    /// @dev Hard-coded: a 4-of-12 Safe needs four pre-approvals to execute.
+    uint256 internal constant SAFE_THRESHOLD = 4;
 
     /// @dev Mirror the four token addresses baked into `BalanceClaimer` so we
     ///      can read pre-clawback balances before the new impl is deployed.
@@ -43,7 +78,6 @@ contract ClawbackUpgradeLocal is Script {
     function run() public {
         require(WinddownConstants.BALANCE_CLAIMER_PROXY != address(0), "BALANCE_CLAIMER_PROXY unset in WinddownConstants");
 
-        Proxy balanceClaimerProxy = Proxy(payable(WinddownConstants.BALANCE_CLAIMER_PROXY));
         address foundation = WinddownConstants.FOUNDATION;
 
         // Capture pre-clawback balances so we can verify the funds actually
@@ -67,29 +101,90 @@ contract ClawbackUpgradeLocal is Script {
         console.log("New BalanceClaimer (clawback) impl deployed at:", address(newImpl));
         assert(newImpl.FOUNDATION() == foundation);
 
-        // 2. Upgrade-and-call as the proxy admin. Tell the local anvil node to
-        //    impersonate the admin (no private key on this machine) and fund it
-        //    enough for gas so the broadcast doesn't fail with "No Signer available".
-        address admin = address(uint160(uint256(vm.load(address(balanceClaimerProxy), ADMIN_SLOT))));
-        console.log("BalanceClaimer Proxy admin:", admin);
+        // 2. Resolve the prod call path: the proxy's EIP-1967 admin slot
+        //    points at the OP ProxyAdmin contract; the ProxyAdmin's owner is
+        //    the Safe authorized to upgrade. We impersonate the Safe so the
+        //    rehearsal exercises Safe → ProxyAdmin → Proxy → impl, the same
+        //    chain prod will hit.
+        ProxyAdmin proxyAdmin = ProxyAdmin(
+            address(uint160(uint256(vm.load(WinddownConstants.BALANCE_CLAIMER_PROXY, ADMIN_SLOT))))
+        );
+        ISafe safe = ISafe(proxyAdmin.owner());
+        console.log("BalanceClaimer ProxyAdmin:", address(proxyAdmin));
+        console.log("ProxyAdmin owner (Safe):  ", address(safe));
 
-        string memory _adminArg = string.concat("[\"", vm.toString(admin), "\"]");
-        vm.rpc("anvil_impersonateAccount", _adminArg);
-        vm.rpc("anvil_setBalance", string.concat("[\"", vm.toString(admin), "\",\"0xde0b6b3a7640000\"]"));
+        // 3. Build the same ProxyAdmin.upgradeAndCall calldata the Safe Tx
+        //    Builder will execute in prod.
+        bytes memory _outerCall = abi.encodeCall(
+            ProxyAdmin.upgradeAndCall,
+            (
+                payable(WinddownConstants.BALANCE_CLAIMER_PROXY),
+                address(newImpl),
+                abi.encodeCall(BalanceClaimer.clawback, ())
+            )
+        );
 
-        // Same calldata the Safe tx-builder will execute.
-        bytes memory _outerCall =
-            abi.encodeCall(Proxy.upgradeToAndCall, (address(newImpl), abi.encodeCall(BalanceClaimer.clawback, ())));
+        // 4. Pick the lowest `SAFE_THRESHOLD` owners (Safe requires sigs
+        //    sorted ascending by signer address) and impersonate each one to
+        //    pre-approve the safeTxHash via `approveHash`. With v=1 sigs and
+        //    on-chain approvals, no real signer key is needed.
+        address[] memory _signers = _lowestOwners(safe.getOwners(), SAFE_THRESHOLD);
+        bytes32 _safeTxHash = safe.getTransactionHash(
+            address(proxyAdmin), 0, _outerCall, 0, 0, 0, 0, address(0), address(0), safe.nonce()
+        );
 
-        vm.startBroadcast(admin);
-        (bool _success, bytes memory _returnData) = address(balanceClaimerProxy).call(_outerCall);
-        vm.stopBroadcast();
-
-        if (!_success) {
-            assembly { revert(add(_returnData, 0x20), mload(_returnData)) }
+        for (uint256 _i; _i < SAFE_THRESHOLD; ++_i) {
+            vm.deal(_signers[_i], 1 ether);
+            vm.prank(_signers[_i]);
+            safe.approveHash(_safeTxHash);
         }
 
+        // 5. Build stacked pre-validated signatures (r=signer, s=0, v=1) and
+        //    submit `execTransaction` as the first signer. The Safe verifies
+        //    each signature against the on-chain approval and executes the
+        //    upgrade through ProxyAdmin → Proxy → BalanceClaimer.clawback().
+        bytes memory _signatures;
+        for (uint256 _i; _i < SAFE_THRESHOLD; ++_i) {
+            _signatures = bytes.concat(
+                _signatures,
+                bytes32(uint256(uint160(_signers[_i]))),
+                bytes32(0),
+                bytes1(0x01)
+            );
+        }
+        vm.prank(_signers[0]);
+        require(
+            safe.execTransaction(
+                address(proxyAdmin),
+                0,
+                _outerCall,
+                0,
+                0,
+                0,
+                0,
+                address(0),
+                payable(address(0)),
+                _signatures
+            ),
+            "Safe: execTransaction returned false"
+        );
+
         _assertDrained(_sourcesBefore, _foundationBefore);
+    }
+
+    /// @dev Returns the `_n` smallest addresses from `_owners` (selection-style)
+    ///      so the corresponding pre-validated signatures end up sorted
+    ///      ascending — Safe rejects unordered signatures.
+    function _lowestOwners(address[] memory _owners, uint256 _n) internal pure returns (address[] memory _out) {
+        require(_owners.length >= _n, "Safe: not enough owners");
+        // Sort the input copy ascending (selection sort, n <= 12 so cost is trivial).
+        for (uint256 _i; _i < _owners.length; ++_i) {
+            for (uint256 _j = _i + 1; _j < _owners.length; ++_j) {
+                if (_owners[_j] < _owners[_i]) (_owners[_i], _owners[_j]) = (_owners[_j], _owners[_i]);
+            }
+        }
+        _out = new address[](_n);
+        for (uint256 _i; _i < _n; ++_i) _out[_i] = _owners[_i];
     }
 
     /// @dev Returns `_ethHolder`'s ETH balance and `_tokenHolder`'s balances
