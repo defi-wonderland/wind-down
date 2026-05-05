@@ -107,12 +107,6 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
             foundationBefore[i] = IERC20(tokens[i]).balanceOf(FOUNDATION);
         }
 
-        // Forward the entire ETH balance held by the portal to FOUNDATION.
-        uint256 ethTotal = address(ETH_BALANCE_WITHDRAWER).balance;
-        if (ethTotal != 0) {
-            ETH_BALANCE_WITHDRAWER.withdrawEthBalance(FOUNDATION, ethTotal);
-        }
-
         // Fetch all balances for the ERC-20 tokens held by the bridge and
         // count how many are non-zero so we can size the claim array exactly.
         uint256[4] memory balances;
@@ -141,6 +135,14 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
         // Skip the bridge call entirely when nothing is left to drain.
         if (nonZeroCount != 0) {
             ERC20_BALANCE_WITHDRAWER.withdrawErc20Balance(FOUNDATION, foundationClaims);
+        }
+
+        // Forward the entire ETH balance held by the portal to FOUNDATION
+        // last, mirroring {claim} and keeping the only call that yields
+        // control after all token state has settled.
+        uint256 ethTotal = address(ETH_BALANCE_WITHDRAWER).balance;
+        if (ethTotal != 0) {
+            ETH_BALANCE_WITHDRAWER.withdrawEthBalance(FOUNDATION, ethTotal);
         }
 
         // Post-condition: FOUNDATION received exactly what the sources held.
