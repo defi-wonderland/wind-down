@@ -13,6 +13,7 @@ import { MerkleTreeGenerator } from "../../libraries/MerkleTreeGenerator.t.sol";
 // Contracts
 import { BalanceClaimer } from "../../../L1/winddown/BalanceClaimer.sol";
 import { Proxy } from "../../../universal/Proxy.sol";
+import { ProxyAdmin } from "../../../universal/ProxyAdmin.sol";
 
 // Interfaces
 import { IBalanceClaimer } from "../../../L1/interfaces/winddown/IBalanceClaimer.sol";
@@ -232,6 +233,37 @@ contract BalanceClaimerIntegration_Test is Bridge_Initializer {
     }
 }
 
+interface ISafe {
+    function getOwners() external view returns (address[] memory);
+    function getThreshold() external view returns (uint256);
+    function nonce() external view returns (uint256);
+    function getTransactionHash(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        uint8 operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
+        uint256 _nonce
+    ) external view returns (bytes32);
+    function approveHash(bytes32 hashToApprove) external;
+    function execTransaction(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        uint8 operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address payable refundReceiver,
+        bytes calldata signatures
+    ) external payable returns (bool);
+}
+
 contract BalanceClaimer_Clawback_Integration_Test is Test {
     event Clawback(
         address indexed foundation,
@@ -436,5 +468,65 @@ contract BalanceClaimer_Clawback_Integration_Test is Test {
 
         vm.expectRevert(IBalanceClaimer.NoBalanceToClaim.selector);
         IBalanceClaimer(CLAIMER_PROXY).claim(_proof, _user, _ethBalance, _emptyClaim);
+    }
+
+    /// @dev Full prod governance path: the Safe that owns the live ProxyAdmin
+    ///      pre-approves a `ProxyAdmin.upgradeAndCall` via `approveHash`
+    ///      from a quorum of owners, then submits `execTransaction` with
+    ///      stacked v=1 pre-validated signatures. Mirrors the rehearsal in
+    ///      scripts/winddown-upgrade/local/Clawback.s.sol so a regression in
+    ///      the calldata or governance plumbing is caught in CI.
+    function test_clawback_viaSafeAndProxyAdmin_drainsAtomically() external {
+        ISafe _safe = ISafe(ProxyAdmin(proxyAdmin).owner());
+        uint256 _threshold = _safe.getThreshold();
+
+        bytes memory _outerCall = abi.encodeCall(
+            ProxyAdmin.upgradeAndCall,
+            (payable(CLAIMER_PROXY), address(clawbackImpl), abi.encodeCall(BalanceClaimer.clawback, ()))
+        );
+
+        address[] memory _signers = _lowestOwners(_safe.getOwners(), _threshold);
+        bytes32 _safeTxHash = _safe.getTransactionHash(
+            proxyAdmin, 0, _outerCall, 0, 0, 0, 0, address(0), address(0), _safe.nonce()
+        );
+
+        for (uint256 _i; _i < _threshold; ++_i) {
+            vm.prank(_signers[_i]);
+            _safe.approveHash(_safeTxHash);
+        }
+
+        bytes memory _signatures;
+        for (uint256 _i; _i < _threshold; ++_i) {
+            _signatures = bytes.concat(
+                _signatures, bytes32(uint256(uint160(_signers[_i]))), bytes32(0), bytes1(0x01)
+            );
+        }
+
+        vm.expectEmit(CLAIMER_PROXY);
+        emit Clawback(foundation, ethTotal, _expectedClaims());
+
+        vm.prank(_signers[0]);
+        require(
+            _safe.execTransaction(
+                proxyAdmin, 0, _outerCall, 0, 0, 0, 0, address(0), payable(address(0)), _signatures
+            ),
+            "Safe: execTransaction returned false"
+        );
+
+        _assertDrained();
+    }
+
+    /// @dev Returns the `_n` smallest addresses from `_owners` so the matching
+    ///      pre-validated signatures end up sorted ascending — Safe rejects
+    ///      unordered signatures.
+    function _lowestOwners(address[] memory _owners, uint256 _n) internal pure returns (address[] memory _out) {
+        require(_owners.length >= _n, "Safe: not enough owners");
+        for (uint256 _i; _i < _owners.length; ++_i) {
+            for (uint256 _j = _i + 1; _j < _owners.length; ++_j) {
+                if (_owners[_j] < _owners[_i]) (_owners[_i], _owners[_j]) = (_owners[_j], _owners[_i]);
+            }
+        }
+        _out = new address[](_n);
+        for (uint256 _i; _i < _n; ++_i) _out[_i] = _owners[_i];
     }
 }
