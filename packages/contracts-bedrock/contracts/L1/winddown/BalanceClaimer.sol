@@ -102,9 +102,9 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
         // transfer delivered the full expected amount. Catches fee-on-transfer
         // / blacklist / pause behavior on any of the four tokens.
         uint256 foundationEthBefore = FOUNDATION.balance;
-        uint256[4] memory foundationBefore;
+        uint256[4] memory foundationERC20sBefore;
         for (uint256 i; i < tokens.length; ++i) {
-            foundationBefore[i] = IERC20(tokens[i]).balanceOf(FOUNDATION);
+            foundationERC20sBefore[i] = IERC20(tokens[i]).balanceOf(FOUNDATION);
         }
 
         // Fetch all balances for the ERC-20 tokens held by the bridge and
@@ -148,7 +148,7 @@ contract BalanceClaimer is Semver, IBalanceClaimer {
         // Post-condition: FOUNDATION received exactly what the sources held.
         if (FOUNDATION.balance != foundationEthBefore + ethTotal) revert ClawbackBalanceMismatch();
         for (uint256 i; i < tokens.length; ++i) {
-            if (IERC20(tokens[i]).balanceOf(FOUNDATION) != foundationBefore[i] + balances[i]) {
+            if (IERC20(tokens[i]).balanceOf(FOUNDATION) != foundationERC20sBefore[i] + balances[i]) {
                 revert ClawbackBalanceMismatch();
             }
         }
