@@ -52,7 +52,9 @@ interface ISafe {
 ///
 ///         The deployer broadcast is delegated to forge's wallet flags: pass
 ///         `--account` and `--sender` so the deployer key stays in a keystore.
-///         Safe owners are impersonated via `vm.prank`, no signer keys needed.
+///         Safe owners are impersonated via `anvil_impersonateAccount` and the
+///         calls are submitted with `vm.broadcast(owner)` so they land on the
+///         fork RPC under `--broadcast --unlocked`.
 contract ClawbackUpgradeLocal is Script {
     /// @dev EIP-1967 admin slot: `bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)`.
     bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
@@ -134,8 +136,8 @@ contract ClawbackUpgradeLocal is Script {
         );
 
         for (uint256 _i; _i < SAFE_THRESHOLD; ++_i) {
-            vm.deal(_signers[_i], 1 ether);
-            vm.prank(_signers[_i]);
+            _impersonateAndFund(_signers[_i]);
+            vm.broadcast(_signers[_i]);
             safe.approveHash(_safeTxHash);
         }
 
@@ -152,7 +154,7 @@ contract ClawbackUpgradeLocal is Script {
                 bytes1(0x01)
             );
         }
-        vm.prank(_signers[0]);
+        vm.broadcast(_signers[0]);
         require(
             safe.execTransaction(
                 address(proxyAdmin),
@@ -185,6 +187,14 @@ contract ClawbackUpgradeLocal is Script {
         }
         _out = new address[](_n);
         for (uint256 _i; _i < _n; ++_i) _out[_i] = _owners[_i];
+    }
+
+    /// @dev Mark `_account` as unlocked on anvil and fund it so the
+    ///      subsequent `vm.broadcast(_account)` call has gas.
+    function _impersonateAndFund(address _account) internal {
+        string memory _addr = vm.toString(_account);
+        vm.rpc("anvil_impersonateAccount", string.concat("[\"", _addr, "\"]"));
+        vm.rpc("anvil_setBalance", string.concat("[\"", _addr, "\",\"0xde0b6b3a7640000\"]"));
     }
 
     /// @dev Returns `_ethHolder`'s ETH balance and `_tokenHolder`'s balances
