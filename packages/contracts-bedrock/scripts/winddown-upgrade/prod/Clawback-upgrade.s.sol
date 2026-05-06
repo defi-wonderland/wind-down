@@ -8,6 +8,11 @@ import { ProxyAdmin } from "contracts/universal/ProxyAdmin.sol";
 import { BalanceClaimer } from "contracts/L1/winddown/BalanceClaimer.sol";
 import { WinddownConstants } from "../WinddownConstants.sol";
 
+interface ISafe {
+    function getOwners() external view returns (address[] memory);
+    function getThreshold() external view returns (uint256);
+}
+
 /// @notice Pure logger: builds and prints the calldata that the Safe owning
 ///         the BalanceClaimer Proxy's `ProxyAdmin` should execute to
 ///         atomically swap to the v2 implementation and drain funds in the
@@ -80,7 +85,16 @@ contract ClawbackUpgrade is Script {
             uint8(ProxyAdmin(_proxyAdmin).proxyType(WinddownConstants.BALANCE_CLAIMER_PROXY)) == 0,
             "ProxyAdmin: BalanceClaimer Proxy is not ERC1967"
         );
-        require(ProxyAdmin(_proxyAdmin).owner() != address(0), "ProxyAdmin: owner is zero");
+        address _safe = ProxyAdmin(_proxyAdmin).owner();
+        require(_safe != address(0), "ProxyAdmin: owner is zero");
+        require(_safe.code.length > 0, "ProxyAdmin owner has no code (not a Safe)");
+
+        // Confirm the owner walks like a Safe: non-zero threshold and at
+        // least `threshold` signers. Catches a misconfigured ProxyAdmin
+        // whose owner is some other contract that happens to expose owner().
+        uint256 _threshold = ISafe(_safe).getThreshold();
+        require(_threshold > 0, "Safe: zero threshold");
+        require(ISafe(_safe).getOwners().length >= _threshold, "Safe: owners < threshold");
 
         bytes memory _innerCall = abi.encodeCall(BalanceClaimer.clawback, ());
         bytes memory _outerCall = abi.encodeCall(
@@ -98,7 +112,7 @@ contract ClawbackUpgrade is Script {
         console.log("==== Reference (verification only, do not paste) ====");
         console.log("Function:               ProxyAdmin.upgradeAndCall(proxy, newImpl, data)");
         console.log("ProxyAdmin (target):    ", _proxyAdmin);
-        console.log("ProxyAdmin owner (Safe):", ProxyAdmin(_proxyAdmin).owner());
+        console.log("ProxyAdmin owner (Safe):", _safe);
         console.log("BalanceClaimer Proxy:   ", WinddownConstants.BALANCE_CLAIMER_PROXY);
         console.log("New implementation:     ", _newImpl);
         console.log("Inner call (clawback):");

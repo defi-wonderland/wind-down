@@ -5,6 +5,8 @@ import { console } from "forge-std/console.sol";
 import { Script } from "forge-std/Script.sol";
 
 import { BalanceClaimer } from "contracts/L1/winddown/BalanceClaimer.sol";
+import { IEthBalanceWithdrawer } from "contracts/L1/interfaces/winddown/IEthBalanceWithdrawer.sol";
+import { IErc20BalanceWithdrawer } from "contracts/L1/interfaces/winddown/IErc20BalanceWithdrawer.sol";
 import { WinddownConstants } from "../WinddownConstants.sol";
 
 /// @notice Deploys the v2 BalanceClaimer implementation with a non-zero garbage
@@ -17,6 +19,41 @@ import { WinddownConstants } from "../WinddownConstants.sol";
 ///         so the deployer key never has to leave the keystore.
 contract ClawbackImplementationDeploy is Script {
     function run() public {
+        // Guard against pointing at a non-mainnet RPC: every constant baked
+        // into the impl is mainnet-specific, so deploying anywhere else
+        // produces an artifact that looks plausible but is wired to ghosts.
+        require(block.chainid == 1, "wrong chainid: expected mainnet (1)");
+
+        // The live proxies and Foundation must already exist on this chain;
+        // a wrong fork could pass the chainid check on a freshly forked node
+        // where these addresses have no code yet.
+        require(
+            WinddownConstants.BALANCE_CLAIMER_PROXY.code.length > 0,
+            "BALANCE_CLAIMER_PROXY has no code"
+        );
+        require(
+            WinddownConstants.OPTIMISM_PORTAL_PROXY.code.length > 0,
+            "OPTIMISM_PORTAL_PROXY has no code"
+        );
+        require(
+            WinddownConstants.L1_STANDARD_BRIDGE_PROXY.code.length > 0,
+            "L1_STANDARD_BRIDGE_PROXY has no code"
+        );
+
+        // The live withdrawers must already authorize BALANCE_CLAIMER_PROXY,
+        // otherwise `clawback()` will revert with `CallerNotBalanceClaimer`
+        // after the upgrade lands.
+        require(
+            IEthBalanceWithdrawer(WinddownConstants.OPTIMISM_PORTAL_PROXY).BALANCE_CLAIMER()
+                == WinddownConstants.BALANCE_CLAIMER_PROXY,
+            "OptimismPortal: BALANCE_CLAIMER mismatch"
+        );
+        require(
+            IErc20BalanceWithdrawer(WinddownConstants.L1_STANDARD_BRIDGE_PROXY).BALANCE_CLAIMER()
+                == WinddownConstants.BALANCE_CLAIMER_PROXY,
+            "L1StandardBridge: BALANCE_CLAIMER mismatch"
+        );
+
         vm.startBroadcast();
 
         BalanceClaimer balanceClaimerImpl = new BalanceClaimer({

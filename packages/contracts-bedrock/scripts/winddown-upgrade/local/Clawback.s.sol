@@ -12,6 +12,7 @@ import { WinddownConstants } from "../WinddownConstants.sol";
 
 interface ISafe {
     function getOwners() external view returns (address[] memory);
+    function getThreshold() external view returns (uint256);
     function nonce() external view returns (uint256);
     function getTransactionHash(
         address to,
@@ -58,9 +59,6 @@ interface ISafe {
 contract ClawbackUpgradeLocal is Script {
     /// @dev EIP-1967 admin slot: `bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)`.
     bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
-    /// @dev Hard-coded: a 4-of-12 Safe needs four pre-approvals to execute.
-    uint256 internal constant SAFE_THRESHOLD = 4;
 
     /// @dev Mirror the four token addresses baked into `BalanceClaimer` so we
     ///      can read pre-clawback balances before the new impl is deployed.
@@ -126,16 +124,17 @@ contract ClawbackUpgradeLocal is Script {
             )
         );
 
-        // 4. Pick the lowest `SAFE_THRESHOLD` owners (Safe requires sigs
-        //    sorted ascending by signer address) and impersonate each one to
-        //    pre-approve the safeTxHash via `approveHash`. With v=1 sigs and
-        //    on-chain approvals, no real signer key is needed.
-        address[] memory _signers = _lowestOwners(safe.getOwners(), SAFE_THRESHOLD);
+        // 4. Read the live Safe threshold and pick the lowest `_threshold`
+        //    owners (Safe requires sigs sorted ascending by signer address);
+        //    impersonate each to pre-approve the safeTxHash via `approveHash`.
+        //    With v=1 sigs and on-chain approvals, no real signer key is needed.
+        uint256 _threshold = safe.getThreshold();
+        address[] memory _signers = _lowestOwners(safe.getOwners(), _threshold);
         bytes32 _safeTxHash = safe.getTransactionHash(
             address(proxyAdmin), 0, _outerCall, 0, 0, 0, 0, address(0), address(0), safe.nonce()
         );
 
-        for (uint256 _i; _i < SAFE_THRESHOLD; ++_i) {
+        for (uint256 _i; _i < _threshold; ++_i) {
             _impersonateAndFund(_signers[_i]);
             vm.broadcast(_signers[_i]);
             safe.approveHash(_safeTxHash);
@@ -146,7 +145,7 @@ contract ClawbackUpgradeLocal is Script {
         //    each signature against the on-chain approval and executes the
         //    upgrade through ProxyAdmin → Proxy → BalanceClaimer.clawback().
         bytes memory _signatures;
-        for (uint256 _i; _i < SAFE_THRESHOLD; ++_i) {
+        for (uint256 _i; _i < _threshold; ++_i) {
             _signatures = bytes.concat(
                 _signatures,
                 bytes32(uint256(uint160(_signers[_i]))),
