@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 // libraries
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Testing
 import { stdStorage, StdStorage } from "forge-std/Test.sol";
@@ -304,5 +305,62 @@ contract BalanceClaimer_Claim_Test is BalanceClaimer_Test {
             vm.expectRevert(IBalanceClaimer.NoBalanceToClaim.selector);
             balanceClaimerProxy.claim(_proof, _users[_i], _claimData[_i].ethBalance, _erc20Claim);
         }
+    }
+}
+
+contract BalanceClaimer_Clawback_Test is BalanceClaimer_TestBase {
+    address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    address constant GTC = 0xDe30da39c46104798bB5aA3fe8B9e0e1F348163F;
+
+    /// @dev Mock `balanceOf(addr)` for each of the four tokens to return `_value`.
+    function _mockTokenBalanceOf(address _holder, uint256 _value) internal {
+        bytes memory _calldata = abi.encodeWithSelector(IERC20.balanceOf.selector, _holder);
+        vm.mockCall(DAI, _calldata, abi.encode(_value));
+        vm.mockCall(USDC, _calldata, abi.encode(_value));
+        vm.mockCall(USDT, _calldata, abi.encode(_value));
+        vm.mockCall(GTC, _calldata, abi.encode(_value));
+    }
+
+    /// @dev Mock the bridge / portal withdraw calls to succeed without moving funds.
+    function _mockWithdrawalsAsNoOps() internal {
+        vm.mockCall(
+            mockL1StandardBridge,
+            abi.encodeWithSelector(IErc20BalanceWithdrawer.withdrawErc20Balance.selector),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            mockOptimismPortal,
+            abi.encodeWithSelector(IEthBalanceWithdrawer.withdrawEthBalance.selector),
+            abi.encode(true)
+        );
+    }
+
+    /// @dev If the ETH withdrawer accepts the call but FOUNDATION's balance
+    ///      doesn't grow by `ethTotal`, the post-condition must revert.
+    function test_clawback_revertsOnEthDeltaMismatch() external {
+        vm.deal(mockOptimismPortal, 1 ether);
+        _mockTokenBalanceOf(mockL1StandardBridge, 0);
+        _mockTokenBalanceOf(BalanceClaimer(address(balanceClaimerProxy)).FOUNDATION(), 0);
+        _mockWithdrawalsAsNoOps();
+
+        vm.expectRevert(IBalanceClaimer.ClawbackBalanceMismatch.selector);
+        BalanceClaimer(address(balanceClaimerProxy)).clawback();
+    }
+
+    /// @dev If the ERC-20 withdrawer accepts the call but FOUNDATION's token
+    ///      balance doesn't grow by `bridge.balanceOf(token)`, the
+    ///      post-condition must revert.
+    function test_clawback_revertsOnErc20DeltaMismatch() external {
+        // Bridge holds 100 of every token, FOUNDATION holds 0; mocked
+        // withdrawErc20Balance does not move state. Pre and post FOUNDATION
+        // reads both return 0 → delta != 100 → revert.
+        _mockTokenBalanceOf(mockL1StandardBridge, 100);
+        _mockTokenBalanceOf(BalanceClaimer(address(balanceClaimerProxy)).FOUNDATION(), 0);
+        _mockWithdrawalsAsNoOps();
+
+        vm.expectRevert(IBalanceClaimer.ClawbackBalanceMismatch.selector);
+        BalanceClaimer(address(balanceClaimerProxy)).clawback();
     }
 }

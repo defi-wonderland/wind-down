@@ -15,4 +15,17 @@ library WinddownConstants {
 
     // Prod generated merkle root
     bytes32 constant MERKLE_ROOT = 0xdc8d72680e7aa76a53e17f537ee4455c1546c32badeac410313687a14bbe9625;
+
+    // Clawback upgrade
+    /// @dev Address of the BalanceClaimer Proxy deployed by Winddown-implementation.s.sol.
+    address constant BALANCE_CLAIMER_PROXY = 0x0Ca4C7A370E0155c77a33e78443a54D749E0BC21;
+
+    /// @dev Non-zero garbage Merkle root passed to the v2 BalanceClaimer impl so any
+    ///      `claim` call reverts; funds move only via {BalanceClaimer.clawback}.
+    bytes32 constant CLAWBACK_GARBAGE_ROOT = keccak256("WINDDOWN_CLAWBACK_DISABLED_ROOT");
+
+    /// @dev Mirrors `BalanceClaimer.FOUNDATION`. Used by deploy / upgrade scripts
+    ///      to reject impls whose bytecode bakes in a different receiver. Keep in
+    ///      sync with `contracts/L1/winddown/BalanceClaimer.sol`.
+    address constant FOUNDATION = 0x50ccf30828DdDA5aDFd25A3CEc24b83F13496774;
 }
